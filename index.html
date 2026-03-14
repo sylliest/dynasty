@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>DYNASTY.EXE</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#04000a;--pink:#ff18d0;--pink2:#ff88ee;--pk3:rgba(255,24,208,.11);
+  --bsz:clamp(40px,5.2vmin,72px);--ptop:12vh;--pbot:10.5vh;--px:7.5vw;
+  --fnt:'Bebas Neue',sans-serif;--mono:'Share Tech Mono',monospace;
+  --ease:cubic-bezier(.4,0,.2,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:var(--mono);color:#fff;user-select:none}
+/* Canvas layers — inside .vp */
+#cam,#c3d,#c2d{position:absolute;top:0;left:0;width:100%;height:100%;display:block}
+#cam{z-index:0;object-fit:cover;transform:scaleX(-1)}
+#c3d{z-index:1;pointer-events:none;background:transparent}
+#c2d{z-index:2;pointer-events:none;background:transparent}
+/* 9-patch */
+.frame{position:fixed;top:var(--ptop);bottom:var(--pbot);left:var(--px);right:var(--px);display:grid;grid-template-columns:var(--bsz) 1fr var(--bsz);grid-template-rows:var(--bsz) 1fr var(--bsz);z-index:10;pointer-events:none}
+.fp{background:rgba(8,0,20,.92);border:1px solid rgba(255,24,208,.28);position:relative;overflow:hidden}
+.fp-corner{display:flex;align-items:center;justify-content:center}
+.fp-corner::after{content:'';width:34%;height:34%;border:1.5px solid rgba(255,24,208,.45);transform:rotate(45deg)}
+.fp-top,.fp-bottom{display:flex;align-items:center;justify-content:center;gap:10px}
+.bar-lbl{font-family:var(--fnt);font-size:clamp(7px,.95vmin,12px);letter-spacing:.5em;color:rgba(255,24,208,.65)}
+.fp-left,.fp-right{display:flex;align-items:center;justify-content:center;overflow:hidden}
+.side-lbl{font-size:clamp(5px,.58vmin,7px);color:rgba(255,24,208,.28);letter-spacing:.3em;white-space:nowrap;writing-mode:vertical-rl}
+.fp-left .side-lbl{transform:rotate(180deg)}
+.sdot{width:6px;height:6px;border-radius:50%;background:#00ff88;flex-shrink:0;animation:blink 1.8s ease-in-out infinite;box-shadow:0 0 6px #00ff88}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.vp{position:relative;background:#000;overflow:hidden;pointer-events:all;cursor:crosshair}
+/* Loading */
+.loading{position:absolute;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:30;transition:opacity .6s}
+.loading.fade{opacity:0;pointer-events:none}.loading.gone{display:none}
+.l-title{font-family:var(--fnt);font-size:clamp(16px,2.4vmin,28px);letter-spacing:.6em;color:var(--pink)}
+.l-sub{font-size:clamp(7px,.8vmin,9px);color:rgba(255,24,208,.38);letter-spacing:.25em;margin-top:-6px}
+.l-track{width:200px;height:1px;background:rgba(255,24,208,.18)}
+.l-fill{height:100%;width:0%;background:var(--pink);transition:width .3s;box-shadow:0 0 6px var(--pink)}
+.l-msg{font-size:clamp(6px,.78vmin,9px);color:rgba(255,24,208,.42);letter-spacing:.18em;text-transform:uppercase;text-align:center;max-width:260px;line-height:1.5}
+/* Drag hint overlay */
+.drag-hint{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:6;font-size:8px;color:rgba(255,24,208,.4);letter-spacing:.2em;pointer-events:none;transition:opacity .4s}
+/* Top UI */
+.ui-top{position:fixed;top:0;left:0;right:0;height:var(--ptop);display:flex;align-items:center;justify-content:center;z-index:20;pointer-events:none}
+.brand{font-family:var(--fnt);font-size:clamp(18px,3.6vmin,42px);letter-spacing:.6em;color:#fff;position:relative;text-shadow:0 0 20px rgba(255,24,208,.3)}
+.brand::before{content:attr(data-t);position:absolute;inset:0;color:var(--pink);clip-path:polygon(0 0,100% 0,100% 40%,0 40%);animation:glitch 7s infinite;text-shadow:none}
+@keyframes glitch{0%,83%,100%{transform:translateX(0);opacity:0}84%{transform:translateX(-6px);opacity:.9}86%{transform:translateX(4px);opacity:.7}88%{transform:translateX(0);opacity:0}}
+/* Bottom UI */
+.ui-bot{position:fixed;bottom:0;left:0;right:0;height:var(--pbot);display:flex;align-items:center;justify-content:center;gap:12px;z-index:20;pointer-events:all}
+.btn{background:transparent;border:1px solid rgba(255,24,208,.32);color:var(--pink);font-family:var(--fnt);font-size:clamp(8px,1.05vmin,13px);letter-spacing:.2em;padding:5px 16px;cursor:pointer;transition:all .15s}
+.btn:hover{background:var(--pk3);border-color:var(--pink)}
+.btn:active{transform:scale(.95)}
+.btn-shutter{width:clamp(34px,4.8vmin,48px);height:clamp(34px,4.8vmin,48px);border-radius:50%;background:var(--pink);border:2px solid rgba(255,255,255,.22);cursor:pointer;position:relative;flex-shrink:0;transition:transform .12s,box-shadow .12s}
+.btn-shutter::after{content:'';position:absolute;inset:5px;border-radius:50%;border:1px solid rgba(255,255,255,.25)}
+.btn-shutter:hover{transform:scale(1.08);box-shadow:0 0 22px var(--pink)}
+.btn-shutter:active{transform:scale(.91)}
+#aname{font-family:var(--fnt);font-size:clamp(9px,1.2vmin,14px);letter-spacing:.35em;color:rgba(255,24,208,.38);min-width:80px;text-align:center}
+/* Flash */
+.flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:500}
+.flash.fire{animation:flashfx .35s ease-out forwards}
+@keyframes flashfx{0%{opacity:.7}100%{opacity:0}}
+
+/* ═══════════════ ACCESSORY PICKER MODAL ═══════════════ */
+.acc-modal{
+  position:fixed;inset:0;z-index:400;
+  background:rgba(4,0,10,.97);
+  display:flex;flex-direction:column;
+  animation:fadeIn .3s var(--ease);
+}
+.acc-modal.hidden{display:none}
+@keyframes fadeIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+.acc-header{
+  flex-shrink:0;
+  padding:18px 24px 12px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid rgba(255,24,208,.2);
+}
+.acc-title{font-family:var(--fnt);font-size:clamp(16px,2.2vmin,26px);letter-spacing:.55em;color:var(--pink);text-shadow:0 0 16px rgba(255,24,208,.5)}
+.acc-close{background:transparent;border:1px solid rgba(255,24,208,.3);color:var(--pink);font-family:var(--fnt);font-size:14px;letter-spacing:.3em;padding:5px 14px;cursor:pointer;transition:all .15s}
+.acc-close:hover{background:var(--pk3);border-color:var(--pink)}
+.acc-tabs{
+  flex-shrink:0;padding:10px 20px 0;
+  display:flex;gap:6px;
+}
+.atab{background:transparent;border:1px solid rgba(255,24,208,.22);color:rgba(255,24,208,.38);font-family:var(--fnt);font-size:clamp(10px,1.2vmin,15px);letter-spacing:.22em;padding:4px 14px;cursor:pointer;transition:all .15s}
+.atab:hover{border-color:var(--pink);color:var(--pink)}
+.atab.on{background:var(--pink);color:#000;border-color:var(--pink)}
+/* 3D preview canvas (shared) */
+#acc-canvas{flex:1;display:block;width:100%;pointer-events:none}
+/* Item overlay grid on top of canvas */
+.acc-grid-overlay{
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+  gap:0;
+  pointer-events:none;
+  padding-top:0;
+}
+.acc-cell{
+  position:relative;
+  border:1px solid rgba(255,24,208,.1);
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:flex-end;padding-bottom:14px;
+  cursor:pointer;pointer-events:all;
+  transition:border-color .18s,background .18s;
+}
+.acc-cell:hover{border-color:rgba(255,24,208,.45);background:rgba(255,24,208,.05)}
+.acc-cell.selected{border:2px solid var(--pink);background:rgba(255,24,208,.08)}
+.acc-cell-name{font-family:var(--fnt);font-size:14px;letter-spacing:.35em;color:rgba(255,255,255,.65);margin-bottom:6px}
+.acc-cell-type{font-size:7px;color:rgba(255,24,208,.45);letter-spacing:.2em;margin-bottom:8px}
+.acc-cell-select{background:transparent;border:1px solid rgba(255,24,208,.35);color:var(--pink);font-family:var(--fnt);font-size:12px;letter-spacing:.25em;padding:4px 16px;cursor:pointer;transition:all .15s;pointer-events:all}
+.acc-cell-select:hover{background:var(--pink);color:#000}
+.acc-add-cell{
+  border:1px dashed rgba(255,24,208,.18);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  cursor:pointer;pointer-events:all;transition:all .18s;
+}
+.acc-add-cell:hover{border-color:var(--pink);background:var(--pk3)}
+.acc-add-icon{font-family:var(--fnt);font-size:32px;color:rgba(255,24,208,.4)}
+.acc-add-lbl{font-size:8px;color:rgba(255,24,208,.35);letter-spacing:.2em}
+.acc-empty-msg{display:flex;align-items:center;justify-content:center;flex:1;font-size:10px;color:rgba(255,255,255,.2);letter-spacing:.2em}
+
+/* ═══════════════ ADMIN PANEL (Ctrl+0) ═══════════════ */
+.admin-panel{position:fixed;right:0;top:0;bottom:0;width:270px;background:rgba(4,0,10,.98);border-left:1px solid rgba(255,24,208,.3);z-index:300;transform:translateX(100%);transition:transform .35s var(--ease);overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,24,208,.3) transparent;padding:18px 14px 24px;display:flex;flex-direction:column;gap:10px}
+.admin-panel.open{transform:translateX(0)}
+.admin-badge{background:rgba(255,24,208,.14);border:1px solid rgba(255,24,208,.38);color:var(--pink);font-family:var(--fnt);font-size:9px;letter-spacing:.4em;text-align:center;padding:4px}
+.admin-kbd{font-size:7px;color:rgba(255,255,255,.18);text-align:center;letter-spacing:.1em}
+.admin-sect{border-top:1px solid rgba(255,24,208,.14);padding-top:10px}
+.admin-sect-lbl{font-family:var(--fnt);font-size:10px;letter-spacing:.4em;color:rgba(255,24,208,.5);display:block;margin-bottom:7px}
+.sr{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.sr label{font-size:8px;color:rgba(255,255,255,.35);letter-spacing:.12em;width:28px;flex-shrink:0;text-align:right}
+.sr input[type=range]{flex:1;height:2px;appearance:none;background:rgba(255,24,208,.2);border-radius:1px;outline:none;cursor:pointer}
+.sr input[type=range]::-webkit-slider-thumb{appearance:none;width:12px;height:12px;border-radius:50%;background:var(--pink);box-shadow:0 0 6px var(--pink);cursor:pointer}
+.sr span{font-size:7px;color:rgba(255,24,208,.7);width:36px;text-align:right;flex-shrink:0}
+.admin-btn{width:100%;background:transparent;border:1px solid rgba(255,24,208,.28);color:var(--pink);font-family:var(--fnt);font-size:11px;letter-spacing:.35em;padding:7px;cursor:pointer;transition:all .15s;margin-top:2px}
+.admin-btn:hover{background:var(--pk3);border-color:var(--pink)}
+.admin-btn.danger{border-color:rgba(255,50,50,.4);color:#ff5555}
+.admin-btn.danger:hover{background:rgba(255,50,50,.1)}
+.file-label{display:block;width:100%;text-align:center;background:transparent;border:1px dashed rgba(255,24,208,.26);color:rgba(255,24,208,.5);font-family:var(--fnt);font-size:11px;letter-spacing:.3em;padding:8px;cursor:pointer;transition:all .15s}
+.file-label:hover{background:var(--pk3);border-color:var(--pink);color:var(--pink)}
+.mask-ind{font-size:7px;color:rgba(255,24,208,.45);letter-spacing:.15em;text-align:center;padding:3px;border:1px solid rgba(255,24,208,.15)}
+#import-file-in,#hdri-file-in{display:none}
+</style>
+</head>
+<body>
+<div class="flash" id="flash"></div>
+
+<!-- ACCESSORY PICKER MODAL -->
+<div class="acc-modal hidden" id="acc-modal">
+  <div class="acc-header">
+    <span class="acc-title">SWITCH ACCESSORY</span>
+    <button class="acc-close" id="acc-close">✕ CLOSE</button>
+  </div>
+  <div class="acc-tabs" id="acc-tabs">
+    <button class="atab on" data-cat="face">FACE</button>
+    <button class="atab" data-cat="neck">NECK</button>
+  </div>
+  <div style="position:relative;flex:1;overflow:hidden">
+    <canvas id="acc-canvas"></canvas>
+    <div class="acc-grid-overlay" id="acc-grid"></div>
+  </div>
+</div>
+
+<!-- ADMIN PANEL -->
+<div class="admin-panel" id="admin">
+  <div class="admin-badge">⬛ ADMIN MODE</div>
+  <div class="admin-kbd">CTRL+0 TOGGLE · CTRL+9 MASK DEBUG</div>
+  <div class="mask-ind" id="mask-ind">FACE MASK: OCCLUDE</div>
+  <div class="admin-sect">
+    <span class="admin-sect-lbl">IMPORT MODEL (STL · OBJ · GLB)</span>
+    <label class="file-label" for="import-file-in">CHOOSE FILE</label>
+    <input type="file" id="import-file-in" accept=".stl,.obj,.glb,.gltf">
+  </div>
+  <div class="admin-sect">
+    <span class="admin-sect-lbl">ANCHOR OFFSET — drag viewport to move X/Y</span>
+    <div class="sr"><label>X</label><input type="range" id="ox" min="-1" max="1" step=".005" value="0"><span id="oxv">0.000</span></div>
+    <div class="sr"><label>Y</label><input type="range" id="oy" min="-1" max="1" step=".005" value="0"><span id="oyv">0.000</span></div>
+    <div class="sr"><label>Z</label><input type="range" id="oz" min="-1" max="1" step=".005" value="0"><span id="ozv">0.000</span></div>
+    <div class="sr"><label>RX</label><input type="range" id="rx" min="-180" max="180" step="1" value="0"><span id="rxv">0°</span></div>
+    <div class="sr"><label>RY</label><input type="range" id="ry" min="-180" max="180" step="1" value="0"><span id="ryv">0°</span></div>
+    <div class="sr"><label>RZ</label><input type="range" id="rz" min="-180" max="180" step="1" value="0"><span id="rzv">0°</span></div>
+    <div class="sr"><label>SC</label><input type="range" id="sc" min=".05" max="4" step=".01" value="1"><span id="scv">1.00x</span></div>
+    <button class="admin-btn" id="offset-reset">RESET OFFSETS</button>
+  </div>
+  <div class="admin-sect">
+    <span class="admin-sect-lbl">MATERIAL</span>
+    <div class="sr"><label>MET</label><input type="range" id="met" min="0" max="1" step=".01" value=".9"><span id="metv">0.90</span></div>
+    <div class="sr"><label>RGH</label><input type="range" id="rgh" min="0" max="1" step=".01" value=".1"><span id="rghv">0.10</span></div>
+  </div>
+  <div class="admin-sect">
+    <span class="admin-sect-lbl">ENVIRONMENT</span>
+    <div class="sr" style="margin-bottom:8px">
+      <label style="width:auto;color:rgba(255,24,208,.5);font-size:8px;letter-spacing:.12em">SRC</label>
+      <select id="env-mode" style="flex:1;background:#06001a;border:1px solid rgba(255,24,208,.3);color:var(--pink);font-family:var(--fnt);font-size:11px;padding:3px 6px;outline:none;cursor:pointer">
+        <option value="camera">CAMERA FEED</option>
+        <option value="builtin">BUILT-IN STUDIO</option>
+        <option value="custom">CUSTOM IMAGE</option>
+      </select>
+    </div>
+    <label class="file-label" for="hdri-file-in">UPLOAD HDRI / IMAGE</label>
+    <input type="file" id="hdri-file-in" accept="image/*">
+  </div>
+  <div class="admin-sect">
+    <button class="admin-btn danger" id="clear-cat">CLEAR CATALOGUE</button>
+  </div>
+  <button class="admin-btn" id="admin-close">CLOSE ADMIN</button>
+</div>
+
+<!-- TOP BRAND -->
+<div class="ui-top"><h1 class="brand" data-t="DYNASTY.EXE">DYNASTY.EXE</h1></div>
+
+<!-- 9-PATCH FRAME -->
+<div class="frame">
+  <div class="fp fp-corner"></div>
+  <div class="fp fp-top"><div class="sdot" id="sdot"></div><span class="bar-lbl">3D AR STUDIO · Y3K</span></div>
+  <div class="fp fp-corner"></div>
+  <div class="fp fp-left"><span class="side-lbl">DYNASTY·DYNASTY·DYNASTY·DYNASTY</span></div>
+
+  <div class="vp" id="vp">
+    <video id="cam" autoplay muted playsinline></video>
+    <canvas id="c3d"></canvas>
+    <canvas id="c2d"></canvas>
+    <div class="drag-hint" id="drag-hint">DRAG TO ADJUST POSITION</div>
+    <div class="loading" id="loading">
+      <span class="l-title">DYNASTY.EXE</span>
+      <span class="l-sub">3D AR STUDIO</span>
+      <div class="l-track"><div class="l-fill" id="lfill"></div></div>
+      <span class="l-msg" id="lmsg">INITIALIZING...</span>
+    </div>
+  </div>
+
+  <div class="fp fp-right"><span class="side-lbl">EXE·EXE·EXE·EXE·EXE·EXE</span></div>
+  <div class="fp fp-corner"></div>
+  <div class="fp fp-bottom"><span id="stext" style="font-family:var(--mono);font-size:clamp(5px,.72vmin,8px);letter-spacing:.18em;color:rgba(255,24,208,.5)">READY</span></div>
+  <div class="fp fp-corner"></div>
+</div>
+
+<!-- BOTTOM CONTROLS -->
+<div class="ui-bot">
+  <span id="aname">NO ITEM</span>
+  <button class="btn" id="btn-switch">SWITCH ACCESSORY</button>
+  <button class="btn-shutter" id="btn-cap" title="Capture"></button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/loaders/MTLLoader.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
+<script>
+/* ==========================================================================
+   DYNASTY.EXE — 3D AR
+   Face mesh: fan-triangulation from face oval → correct face-shaped occluder
+   Glasses: positioned from MediaPipe 4×4 head pose matrix + 3D eye span
+   Accessory modal: one Three.js renderer, scissor/viewport per item
+   ========================================================================== */
+
+/* ── DOM ── */
+var video     = document.getElementById('cam');
+var c3d       = document.getElementById('c3d');
+var c2d       = document.getElementById('c2d');
+var ctx2d     = c2d.getContext('2d');
+var sdot      = document.getElementById('sdot');
+var stext     = document.getElementById('stext');
+var aname     = document.getElementById('aname');
+var loadEl    = document.getElementById('loading');
+var lfill     = document.getElementById('lfill');
+var lmsg      = document.getElementById('lmsg');
+var flashEl   = document.getElementById('flash');
+var adminEl   = document.getElementById('admin');
+var accModal  = document.getElementById('acc-modal');
+var vpEl      = document.getElementById('vp');
+var maskInd   = document.getElementById('mask-ind');
+var dragHint  = document.getElementById('drag-hint');
+
+/* ── CONSTANTS ── */
+var FOV    = 60;
+var FACE_Z = -2.5;
+var DEG    = Math.PI / 180;
+var WORLD_H = 2 * Math.abs(FACE_Z) * Math.tan(FOV * DEG / 2);
+var WORLD_W = WORLD_H;
+
+/* ── STATE ── */
+var faceDet = null, poseDet = null;
+var activeCat = 'face', activeProd = null;
+var faceAnchor = null, offsetGroup = null;
+var vpW = 800, vpH = 600;
+var adminOpen = false, maskDebug = false;
+var envMode = 'camera';
+var customEnvTex = null, builtinEnv = null, videoEnvTex = null;
+var catalogue = { face:[], neck:[] };
+var modelCache = {};
+var scene, camera, renderer;
+var faceMeshPos, faceMeshGeo, faceMeshObj;
+var faceMeshMatOcc, faceMeshMatDbg;
+
+/* ── FACE MESH LANDMARK ZONES ─────────────────────────────
+   We use 3 concentric rings + centroid to triangulate the face:
+   Ring 0 (OVAL)  — 36 silhouette points around face edge
+   Ring 1 (INNER) — 16 mid-face points (cheeks, brows, jaw)
+   Ring 2 (CORE)  — 8 central face points (nose, brow centre)
+   CENTROID       — single centre vertex (index = total lm count + 3)
+   Between each adjacent ring we stitch quads → 2 triangles each.
+   This gives a smooth, depth-varying face surface instead of a
+   single flat fan from centre → silhouette.
+   ────────────────────────────────────────────────────────── */
+var OVAL_IDX = [
+  10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,
+  400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109
+];
+/* Ring 1: mid-face — one point roughly between oval and core per sector */
+var INNER_IDX = [
+  9,299,333,334,296,285,  // right top arc
+  417,351,         // right jaw
+  396,369,         // chin
+  395,364,         // left jaw
+  266,330,         // left
+  8,107,66,105,63   // left top arc + forehead
+];
+/* Ring 2: core face surface points */
+var CORE_IDX = [
+  151,108,69,104,  // forehead/brow
+  68,104,69,108,   // inner brow
+  1,4,5,168,       // nose
+  175,199          // chin middle
+];
+/* CENTROID: index 470 (beyond the 468 mp landmarks + ring 1 count) */
+var CENTROID_IDX = 470;
+
+/* Build tri list by stitching Ring0↔Ring1, Ring1↔core, core→centroid */
+var FACE_FAN_TRIS = (function() {
+  var tris = [];
+  var N0 = OVAL_IDX.length;  // 36
+  var N1 = INNER_IDX.length; // ~13
+
+  /* Fan from centroid (idx 470) through ALL oval points — reversed winding
+     so front-face points TOWARD camera (Three.js default CCW = front) */
+  for (var i = 0; i < N0; i++) {
+    var a = OVAL_IDX[i];
+    var b = OVAL_IDX[(i + 1) % N0];
+    /* CCW when viewed from camera: centroid, next, current */
+    tris.push(CENTROID_IDX, b, a);
+  }
+
+  /* Additional face surface triangles using inner ring landmarks
+     These add depth variation — forehead, cheeks, jaw, nose */
+  /* Forehead strip */
+  tris.push(9,10,109,  9,109,67,  9,67,103,  9,103,54,
+            9,54,21,   9,21,162,  9,162,127, 9,127,234,
+            9,234,93,  9,93,132,  9,132,58,  9,58,172);
+  /* Right cheek */
+  tris.push(116,117,118, 50,116,118, 36,50,118, 36,118,119,
+            205,36,119,  205,119,120, 205,120,231);
+  /* Left cheek */
+  tris.push(345,346,347, 280,345,347, 266,280,347, 266,347,348,
+            425,266,348, 425,348,349, 425,349,451);
+  /* Nose bridge */
+  tris.push(168,6,197,   6,195,197,  195,5,197, 5,4,197,
+            4,1,197,     1,2,197,    2,98,197,  98,327,197);
+  /* Chin / jaw */
+  tris.push(152,175,148, 175,396,148, 396,377,148,
+            175,171,396, 171,396,395, 171,395,394,
+            175,148,176, 175,176,149);
+
+  return new Uint16Array(tris);
+})();
+
+/* ── THREE.JS INIT ── */
+function initThree() {
+  var rect = vpEl.getBoundingClientRect();
+  vpW = Math.floor(rect.width)  || 800;
+  vpH = Math.floor(rect.height) || 600;
+  c3d.width = c2d.width = vpW;
+  c3d.height= c2d.height= vpH;
+
+  renderer = new THREE.WebGLRenderer({canvas:c3d, alpha:true, antialias:true, premultipliedAlpha:false});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0, 0);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.35;
+
+  camera = new THREE.PerspectiveCamera(FOV, vpW/vpH, 0.001, 100);
+  camera.position.set(0, 0, 0);
+  camera.lookAt(0, 0, -1);
+
+  scene = new THREE.Scene();
+  scene.add(new THREE.AmbientLight(0x111122, 0.5));
+  var key  = new THREE.DirectionalLight(0xffffff, 1.8);  key.position.set(0.5,1.2,2);   scene.add(key);
+  var fill = new THREE.DirectionalLight(0xff44cc, 0.8);  fill.position.set(-2,0.5,1.5); scene.add(fill);
+  var rim  = new THREE.DirectionalLight(0x44eeff, 0.65); rim.position.set(0.5,-1.5,1);  scene.add(rim);
+  var back = new THREE.DirectionalLight(0x8822ff, 0.35); back.position.set(0,0,-3);      scene.add(back);
+
+  builtinEnv   = buildEnvMap();
+  videoEnvTex  = new THREE.VideoTexture(video);
+  videoEnvTex.mapping   = THREE.EquirectangularReflectionMapping;
+  videoEnvTex.minFilter = THREE.LinearFilter;
+  videoEnvTex.magFilter = THREE.LinearFilter;
+  applyEnvMode('camera');
+
+  faceAnchor  = new THREE.Group(); scene.add(faceAnchor);
+  offsetGroup = new THREE.Group(); faceAnchor.add(offsetGroup);
+
+  initFaceMesh();
+  WORLD_W = WORLD_H * (vpW/vpH);
+}
+
+/* ── FACE MESH (improved fan triangulation) ── */
+function initFaceMesh() {
+  /* Buffer: 471 slots — 468 mp landmarks + 3 spare → centroid at index 470 */
+  faceMeshPos = new Float32Array(471 * 3);
+  faceMeshGeo = new THREE.BufferGeometry();
+  faceMeshGeo.setAttribute('position', new THREE.BufferAttribute(faceMeshPos, 3));
+  faceMeshGeo.setIndex(new THREE.BufferAttribute(FACE_FAN_TRIS, 1));
+
+  /* DoubleSide: writes depth regardless of winding, catches any camera angle */
+  faceMeshMatOcc = new THREE.MeshBasicMaterial({
+    colorWrite: false, side: THREE.DoubleSide,
+    depthWrite: true,  depthTest: true
+  });
+  faceMeshMatDbg = new THREE.MeshBasicMaterial({
+    color: 0xff18d0, transparent: true, opacity: 0.32,
+    side: THREE.DoubleSide, wireframe: false,
+    depthWrite: true, depthTest: true
+  });
+
+  faceMeshObj = new THREE.Mesh(faceMeshGeo, faceMeshMatOcc);
+  faceMeshObj.renderOrder = 0;
+  faceMeshObj.frustumCulled = false;
+  faceMeshObj.visible = false;
+  scene.add(faceMeshObj);
+}
+
+function updateFaceMesh(lm) {
+  if (!lm || lm.length < 468) { faceMeshObj.visible = false; return; }
+  faceMeshObj.visible = true;
+
+  for (var i = 0; i < 468; i++) {
+    var p = lm[i];
+    faceMeshPos[i*3+0] = -(p.x - 0.5) * WORLD_W;
+    faceMeshPos[i*3+1] = -(p.y - 0.5) * WORLD_H;
+    /* depth multiplier 3.2 → nose protrudes enough to occlude glasses bridge */
+    faceMeshPos[i*3+2] = FACE_Z - p.z * WORLD_W * 3.2;
+  }
+
+  /* Centroid at CENTROID_IDX (470) = average of oval points */
+  var cx=0, cy=0, cz=0;
+  for (var k = 0; k < OVAL_IDX.length; k++) {
+    var lk = lm[OVAL_IDX[k]]; cx += lk.x; cy += lk.y; cz += lk.z;
+  }
+  var n = OVAL_IDX.length; cx/=n; cy/=n; cz/=n;
+  faceMeshPos[CENTROID_IDX*3+0] = -(cx - 0.5) * WORLD_W;
+  faceMeshPos[CENTROID_IDX*3+1] = -(cy - 0.5) * WORLD_H;
+  faceMeshPos[CENTROID_IDX*3+2] = FACE_Z - cz * WORLD_W * 3.2;
+
+  faceMeshGeo.attributes.position.needsUpdate = true;
+  faceMeshGeo.computeBoundingSphere();
+}
+
+function toggleMaskDebug() {
+  maskDebug = !maskDebug;
+  if (faceMeshObj) faceMeshObj.material = maskDebug ? faceMeshMatDbg : faceMeshMatOcc;
+  maskInd.textContent = 'FACE MASK: ' + (maskDebug ? 'DEBUG PINK' : 'OCCLUDE');
+  maskInd.style.color = maskDebug ? '#ff18d0' : 'rgba(255,24,208,.45)';
+}
+
+/* ── MODEL BUILDING ── */
+function matPBR(color, met, rgh) {
+  return new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(color), metalness:met, roughness:rgh,
+    reflectivity:1, envMapIntensity:1.9, clearcoat:0.25, clearcoatRoughness:0.1
+  });
+}
+
+var GLASSES_OUTER_SPAN = 0;
+function makeGlasses(color, met, rgh) {
+  var g = new THREE.Group();
+  var R = 0.178, r = 0.013;
+  var cx = R + r + 0.002;
+  GLASSES_OUTER_SPAN = (cx + R + r) * 2;
+
+  var lGeo = new THREE.TorusGeometry(R, r, 10, 52);
+  var ll = new THREE.Mesh(lGeo, matPBR(color,met,rgh)); ll.position.x = -cx; g.add(ll);
+  var rl = new THREE.Mesh(lGeo, matPBR(color,met,rgh)); rl.position.x =  cx; g.add(rl);
+
+  var fGeo = new THREE.CircleGeometry(R - r*0.5, 44);
+  var tint = new THREE.MeshPhysicalMaterial({color:0x001828,transparent:true,opacity:0.56,roughness:0,metalness:0.04,side:THREE.FrontSide});
+  [-cx, cx].forEach(function(x) {
+    var m = new THREE.Mesh(fGeo, tint.clone()); m.position.set(x, 0, -0.005); g.add(m);
+  });
+
+  var br = new THREE.Mesh(new THREE.CylinderGeometry(0.008,0.008,0.06,8), matPBR(color,met,rgh));
+  br.rotation.z = Math.PI/2; br.position.set(0, 0.022, 0); g.add(br);
+
+  var npG = new THREE.SphereGeometry(0.010, 6, 6);
+  [-0.026,0.026].forEach(function(x){var m=new THREE.Mesh(npG,matPBR(color,met,rgh));m.position.set(x,-0.014,0.013);g.add(m);});
+
+  var hnG = new THREE.SphereGeometry(0.012, 6, 6);
+  [-(cx+R+r), cx+R+r].forEach(function(x){var m=new THREE.Mesh(hnG,matPBR(color,met,rgh));m.position.set(x,0,0);g.add(m);});
+
+  var aG = new THREE.CylinderGeometry(0.009,0.004,0.44,7);
+  var h = cx+R+r;
+  var la=new THREE.Mesh(aG,matPBR(color,met,rgh)); la.rotation.z= Math.PI/2; la.position.set(-h-0.22,0,-0.024); g.add(la);
+  var ra=new THREE.Mesh(aG,matPBR(color,met,rgh)); ra.rotation.z=-Math.PI/2; ra.position.set( h+0.22,0,-0.024); g.add(ra);
+
+  g.renderOrder=1; g.traverse(function(c){if(c.isMesh)c.renderOrder=1;});
+  scene.add(g); g.visible=false;
+  return g;
+}
+
+var NECK_SPAN = 0.82;
+function makeNecklace(color, met, rgh) {
+  var g = new THREE.Group();
+  for (var i=0;i<24;i++) {
+    var t=i/23, x=(t-0.5)*NECK_SPAN, y=-Math.sin(t*Math.PI)*0.20;
+    var lk=new THREE.Mesh(new THREE.TorusGeometry(0.017,0.0052,7,16), matPBR(color,met,rgh));
+    lk.position.set(x,y,0); lk.rotation.y=(i%2===0)?Math.PI/2:0; g.add(lk);
+  }
+  var cn=new THREE.Mesh(new THREE.CylinderGeometry(0.004,0.004,0.046,7),matPBR(color,met,rgh));
+  cn.position.set(0,-0.228,0); g.add(cn);
+  var pm=new THREE.MeshPhysicalMaterial({color:new THREE.Color(color),metalness:0.9,roughness:0.04,reflectivity:1,envMapIntensity:2.5,emissive:new THREE.Color(color),emissiveIntensity:0.05});
+  var pd=new THREE.Mesh(new THREE.OctahedronGeometry(0.060,0),pm);
+  pd.position.set(0,-0.278,0); pd.rotation.y=Math.PI/4; g.add(pd);
+  g.renderOrder=1; g.traverse(function(c){if(c.isMesh)c.renderOrder=1;});
+  scene.add(g); g.visible=false;
+  return g;
+}
+
+function defOff() { return {px:0,py:0,pz:0,rx:0,ry:0,rz:0,scale:1,met:.9,rgh:.1}; }
+
+function buildDefaults() {
+  var f=[
+    {id:'g1',name:'CHROME',  type:'face',color:'#c8dcf0',met:.95,rgh:.05},
+    {id:'g2',name:'ONYX',    type:'face',color:'#0d0d1a',met:.80,rgh:.20},
+    {id:'g3',name:'GOLD',    type:'face',color:'#d4a020',met:.96,rgh:.04},
+    {id:'g4',name:'MAGENTA', type:'face',color:'#cc0088',met:.72,rgh:.15},
+  ];
+  var n=[
+    {id:'n1',name:'CHAIN',  type:'neck',color:'#e8b820',met:.96,rgh:.05},
+    {id:'n2',name:'CIRCUIT',type:'neck',color:'#00e88a',met:.85,rgh:.10},
+    {id:'n3',name:'SILVER', type:'neck',color:'#ddeeff',met:.94,rgh:.06},
+  ];
+  f.forEach(function(p){p.offset=defOff();modelCache[p.id]=makeGlasses(p.color,p.met,p.rgh);catalogue.face.push(p);});
+  n.forEach(function(p){p.offset=defOff();modelCache[p.id]=makeNecklace(p.color,p.met,p.rgh);catalogue.neck.push(p);});
+}
+
+/* ── HEAD POSE ── */
+var _mat4 = new THREE.Matrix4();
+var _qRaw = new THREE.Quaternion();
+
+function applyFacePose(lm, mx) {
+  if (!lm || lm.length < 468) { faceAnchor.visible=false; return false; }
+  var eL=lm[33], eR=lm[263];
+  if (!eL||!eR) { faceAnchor.visible=false; return false; }
+
+  /* Position: midpoint of outer eye corners */
+  faceAnchor.position.set(
+    -((eL.x+eR.x)*0.5 - 0.5) * WORLD_W,
+    -((eL.y+eR.y)*0.5 - 0.5) * WORLD_H,
+    FACE_Z
+  );
+
+  /* Scale: true 3D eye span (stable when head turns) */
+  var dx=(eR.x-eL.x)*WORLD_W, dy=(eR.y-eL.y)*WORLD_H, dz=(eR.z-eL.z)*WORLD_W;
+  var span3D = Math.max(Math.sqrt(dx*dx+dy*dy+dz*dz), 0.001);
+  faceAnchor.scale.setScalar(span3D / (GLASSES_OUTER_SPAN * 0.60));
+
+  /* Rotation: 4×4 head-pose matrix */
+  if (mx && mx.data) {
+    var d=mx.data;
+    _mat4.set(d[0],d[4],d[8],0, d[1],d[5],d[9],0, d[2],d[6],d[10],0, 0,0,0,1);
+    _qRaw.setFromRotationMatrix(_mat4);
+    faceAnchor.quaternion.set(_qRaw.x, -_qRaw.y, -_qRaw.z, _qRaw.w);
+  }
+  faceAnchor.visible=true; return true;
+}
+
+function applyNeckPose(lm) {
+  if (!lm||!lm.length) { faceAnchor.visible=false; return false; }
+  var LS=lm[11], RS=lm[12]; if(!LS||!RS){faceAnchor.visible=false;return false;}
+  var cx=-((LS.x+RS.x)*0.5-0.5)*WORLD_W;
+  var cy=-((LS.y+RS.y)*0.5-0.5)*WORLD_H;
+  var dx=(RS.x-LS.x)*WORLD_W, dy=(RS.y-LS.y)*WORLD_H, dz=(RS.z-LS.z)*WORLD_W;
+  var span3D=Math.max(Math.sqrt(dx*dx+dy*dy+dz*dz),0.001);
+  faceAnchor.position.set(cx,cy,FACE_Z);
+  faceAnchor.scale.setScalar(span3D/NECK_SPAN*0.92);
+  faceAnchor.quaternion.identity();
+  faceAnchor.visible=true; return true;
+}
+
+function applyOffset(prod) {
+  if (!prod||!prod.offset) return;
+  var o=prod.offset;
+  offsetGroup.position.set(o.px,o.py,o.pz);
+  offsetGroup.rotation.set(o.rx*DEG,o.ry*DEG,o.rz*DEG);
+  offsetGroup.scale.setScalar(o.scale);
+}
+
+function setActiveModel(prod) {
+  while(offsetGroup.children.length) offsetGroup.remove(offsetGroup.children[0]);
+  Object.keys(modelCache).forEach(function(k){modelCache[k].visible=false;});
+  if (!prod){faceAnchor.visible=false;return;}
+  var m=modelCache[prod.id]; if(!m)return;
+  m.visible=true; offsetGroup.add(m); applyOffset(prod);
+}
+
+function selectProd(prod) {
+  activeProd=prod;
+  aname.textContent=prod?prod.name:'NO ITEM';
+  setActiveModel(prod);
+  syncAdminUI();
+}
+
+/* ══════════════════════════════════════════════════════
+   ACCESSORY MODAL — one renderer, scissor per item
+   ══════════════════════════════════════════════════════ */
+var modalRenderer=null, modalScene=null, modalCamera=null;
+var modalItems=[]; // {prod, model, angle}
+var modalRAF=null;
+var modalCat='face';
+
+function openAccModal() {
+  accModal.classList.remove('hidden');
+  buildModalItems();
+  startModalRender();
+}
+function closeAccModal() {
+  accModal.classList.add('hidden');
+  if(modalRAF){cancelAnimationFrame(modalRAF);modalRAF=null;}
+  if(modalRenderer){modalRenderer.dispose();modalRenderer=null;}
+}
+
+function buildModalItems() {
+  var accCanvas = document.getElementById('acc-canvas');
+  var grid = document.getElementById('acc-grid');
+  grid.innerHTML='';
+  modalItems=[];
+
+  var list = catalogue[modalCat] || [];
+
+  /* Resize canvas to parent */
+  var parent = accCanvas.parentElement;
+  var pw = parent.offsetWidth || 800;
+  var ph = parent.offsetHeight || 600;
+  accCanvas.width  = pw;
+  accCanvas.height = ph;
+  accCanvas.style.width  = pw+'px';
+  accCanvas.style.height = ph+'px';
+
+  /* Create/recreate renderer */
+  if(modalRenderer){modalRenderer.dispose();}
+  modalRenderer = new THREE.WebGLRenderer({canvas:accCanvas, antialias:true, alpha:true, premultipliedAlpha:false});
+  modalRenderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  modalRenderer.setClearColor(0x060010,1);
+  modalRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+  modalRenderer.toneMappingExposure = 1.35;
+  modalRenderer.setScissorTest(true);
+
+  modalScene = new THREE.Scene();
+  modalScene.environment = builtinEnv;
+  modalScene.add(new THREE.AmbientLight(0x222244,0.6));
+  var pk=new THREE.DirectionalLight(0xffffff,1.8); pk.position.set(1,1.5,2); modalScene.add(pk);
+  var pf=new THREE.DirectionalLight(0xff44cc,0.7); pf.position.set(-2,0,1.5); modalScene.add(pf);
+  var pr=new THREE.DirectionalLight(0x44eeff,0.5); pr.position.set(0,-1,1); modalScene.add(pr);
+
+  /* Compute grid layout */
+  var cols = Math.max(1, Math.floor(pw / 160));
+  var itemW = Math.floor(pw / cols);
+  var itemH = Math.max(160, Math.floor(ph / Math.max(1, Math.ceil((list.length+1)/cols))));
+
+  grid.style.gridTemplateColumns = 'repeat('+cols+', 1fr)';
+
+  list.forEach(function(prod, idx) {
+    /* Clone model into modal scene */
+    var src = modelCache[prod.id];
+    /* Deep clone so modal spin doesn't affect main scene transform */
+    var clone = src ? src.clone(true) : null;
+    if (clone) {
+      /* Force entire hierarchy visible — clone inherits parent's visible:false */
+      clone.visible = true;
+      clone.traverse(function(c){
+        c.visible = true;
+        if(c.isMesh) c.renderOrder = 0;
+      });
+      modalScene.add(clone);
+    }
+
+    var col = idx % cols;
+    var row = Math.floor(idx / cols);
+    var vx = col * itemW;
+    var vy = ph - (row+1)*itemH;
+
+    /* Camera pulled back to fit widest model (glasses arms extend ~0.6 from centre) */
+    var cam = new THREE.PerspectiveCamera(50, itemW/itemH, 0.001, 100);
+    cam.position.set(0, 0.05, prod.type==='neck' ? 1.6 : 1.4);
+    cam.lookAt(0, 0, 0);
+
+    modalItems.push({prod:prod, model:clone, cam:cam, vx:vx, vy:vy, vw:itemW, vh:itemH, angle:0});
+
+    /* Overlay cell */
+    var cell = document.createElement('div');
+    cell.className = 'acc-cell' + (activeProd&&activeProd.id===prod.id?' selected':'');
+    cell.innerHTML =
+      '<div class="acc-cell-name">'+prod.name+'</div>'+
+      '<div class="acc-cell-type">'+prod.type.toUpperCase()+'</div>'+
+      '<button class="acc-cell-select" data-id="'+prod.id+'">SELECT</button>';
+    cell.querySelector('.acc-cell-select').addEventListener('click', function(e) {
+      e.stopPropagation();
+      var id = e.target.dataset.id;
+      var p = findProd(id);
+      if (p) { selectProd(p); closeAccModal(); }
+    });
+    cell.addEventListener('click', function() {
+      var id = this.querySelector('[data-id]').dataset.id;
+      var p = findProd(id);
+      if (p) { selectProd(p); closeAccModal(); }
+    }.bind(cell));
+    grid.appendChild(cell);
+  });
+
+  /* Add import cell */
+  var addCell = document.createElement('div');
+  addCell.className = 'acc-add-cell';
+  addCell.innerHTML='<div class="acc-add-icon">+</div><div class="acc-add-lbl">IMPORT MODEL</div>';
+  addCell.addEventListener('click', function(){ closeAccModal(); document.getElementById('import-file-in').click(); });
+  grid.appendChild(addCell);
+
+  /* If empty, show message */
+  if (!list.length) {
+    var msg = document.createElement('div');
+    msg.className = 'acc-empty-msg';
+    msg.textContent = 'NO ITEMS — USE + TO IMPORT';
+    msg.style.gridColumn = '1/-1';
+    grid.appendChild(msg);
+  }
+}
+
+function startModalRender() {
+  if(modalRAF){cancelAnimationFrame(modalRAF);modalRAF=null;}
+  function mloop() {
+    modalRAF=requestAnimationFrame(mloop);
+    if(!modalRenderer||!modalScene) return;
+    modalRenderer.setClearColor(0x060010,1);
+    modalRenderer.clear();
+    modalItems.forEach(function(item) {
+      if (!item.model) return;
+      item.angle += 0.012;
+      item.model.rotation.y = item.angle;
+      modalRenderer.setViewport(item.vx, item.vy, item.vw, item.vh);
+      modalRenderer.setScissor(item.vx, item.vy, item.vw, item.vh);
+      modalRenderer.render(modalScene, item.cam);
+    });
+  }
+  mloop();
+}
+
+function findProd(id) {
+  var all = catalogue.face.concat(catalogue.neck);
+  for(var i=0;i<all.length;i++) if(all[i].id===id) return all[i];
+  return null;
+}
+
+/* Tab switching in modal */
+document.getElementById('acc-tabs').addEventListener('click', function(e) {
+  var b=e.target.closest('.atab'); if(!b) return;
+  modalCat=b.dataset.cat;
+  document.querySelectorAll('.atab').forEach(function(x){x.classList.remove('on');});
+  b.classList.add('on');
+  buildModalItems();
+  startModalRender();
+});
+document.getElementById('acc-close').addEventListener('click', closeAccModal);
+document.getElementById('btn-switch').addEventListener('click', function() {
+  modalCat = activeProd ? activeProd.type : 'face';
+  document.querySelectorAll('.atab').forEach(function(x){x.classList.remove('on');});
+  var t=document.querySelector('[data-cat="'+modalCat+'"]'); if(t) t.classList.add('on');
+  openAccModal();
+});
+
+/* ══════════════════════════════════════════════════════
+   IMPORT: STL · OBJ+MTL · GLB
+   ══════════════════════════════════════════════════════ */
+document.getElementById('import-file-in').addEventListener('change', function(e) {
+  var file=e.target.files[0]; if(!file) return;
+  e.target.value='';
+  var ext=file.name.split('.').pop().toLowerCase();
+  var name=file.name.replace(/\.[^.]+$/,'').toUpperCase().slice(0,12);
+  var url=URL.createObjectURL(file);
+
+  function addImport(group) {
+    /* Auto-centre + normalise.
+       Correct formula: position = -centre * normalised_scale
+       so that (position + centre * scale) = 0 → visually centred at origin */
+    var box=new THREE.Box3().setFromObject(group);
+    var ctr=new THREE.Vector3(); box.getCenter(ctr);
+    var sz=new THREE.Vector3(); box.getSize(sz);
+    var ms=Math.max(sz.x,sz.y,sz.z)||1;
+    var ns=0.38/ms;
+    group.position.set(-ctr.x*ns, -ctr.y*ns, -ctr.z*ns);
+    group.scale.setScalar(ns);
+    group.traverse(function(c){
+      if(c.isMesh){
+        c.geometry.computeVertexNormals();
+        /* Preserve existing textures/materials from GLB/OBJ; only set fallback if none */
+        if(!c.material || Array.isArray(c.material) ? false : !c.material.map && !c.material.color) {
+          c.material=new THREE.MeshPhysicalMaterial({color:0xc8d8f0,metalness:.9,roughness:.08,reflectivity:1,envMapIntensity:1.8});
+        }
+        if(c.material && !Array.isArray(c.material)) {
+          c.material.envMapIntensity = c.material.envMapIntensity || 1.5;
+        }
+        c.renderOrder=1;
+      }
+    });
+    group.visible=false; group.renderOrder=1;
+    scene.add(group);
+
+    var id='import_'+Date.now();
+    var prod={id:id,name:name,type:'face',color:'#c8d8ff',offset:defOff(),isImport:true};
+    modelCache[id]=group;
+    catalogue.face.push(prod);
+    /* Show accessory modal so user can preview and select */
+    setTimeout(function(){ openAccModal(); },200);
+    URL.revokeObjectURL(url);
+  }
+
+  if (ext==='glb'||ext==='gltf') {
+    var loader=new THREE.GLTFLoader();
+    var dracoLoader=new THREE.DRACOLoader();
+    dracoLoader.setDecoderPath('https://unpkg.com/three@0.128.0/examples/js/libs/draco/');
+    loader.setDRACOLoader(dracoLoader);
+    loader.load(url, function(gltf){ addImport(gltf.scene); }, undefined, function(err){ lmsg.textContent='GLB ERROR: '+err.message; });
+  } else if (ext==='obj') {
+    var reader3=new FileReader();
+    reader3.onload=function(ev){
+      var g=new THREE.OBJLoader().parse(ev.target.result);
+      addImport(g);
+    };
+    reader3.readAsText(file);
+  } else if (ext==='stl') {
+    var reader2=new FileReader();
+    reader2.onload=function(ev){
+      var geo=new THREE.STLLoader().parse(ev.target.result);
+      geo.computeVertexNormals();
+      var g=new THREE.Group();
+      g.add(new THREE.Mesh(geo,new THREE.MeshPhysicalMaterial({color:0xc8d8f0,metalness:.9,roughness:.08,reflectivity:1,envMapIntensity:1.8})));
+      /* Do NOT pre-transform geo here — addImport will centre + scale the group */
+      addImport(g);
+    };
+    reader2.readAsArrayBuffer(file);
+  }
+});
+
+/* ══════════════════════════════════════════════════════
+   VIEWPORT DRAG — moves X/Y offset directly on canvas
+   ══════════════════════════════════════════════════════ */
+var dragging=false, dragLastX=0, dragLastY=0;
+
+vpEl.addEventListener('mousedown', function(e){
+  if(e.button!==0) return;
+  dragging=true; dragLastX=e.clientX; dragLastY=e.clientY;
+  vpEl.style.cursor='grabbing';
+  dragHint.style.opacity='0';
+});
+document.addEventListener('mousemove', function(e){
+  if(!dragging||!activeProd) return;
+  var rect=vpEl.getBoundingClientRect();
+  var dx=(e.clientX-dragLastX)/rect.width  * 1.5;
+  var dy=(e.clientY-dragLastY)/rect.height * 1.5;
+  dragLastX=e.clientX; dragLastY=e.clientY;
+  activeProd.offset.px=Math.max(-1,Math.min(1,(activeProd.offset.px||0)+dx));
+  activeProd.offset.py=Math.max(-1,Math.min(1,(activeProd.offset.py||0)-dy));
+  applyOffset(activeProd);
+  syncAdminUI();
+});
+document.addEventListener('mouseup', function(){
+  dragging=false; vpEl.style.cursor='crosshair';
+});
+/* Touch support */
+vpEl.addEventListener('touchstart', function(e){
+  var t=e.touches[0];
+  dragging=true; dragLastX=t.clientX; dragLastY=t.clientY;
+  dragHint.style.opacity='0';
+},{passive:true});
+document.addEventListener('touchmove', function(e){
+  if(!dragging||!activeProd) return;
+  var t=e.touches[0];
+  var rect=vpEl.getBoundingClientRect();
+  var dx=(t.clientX-dragLastX)/rect.width  * 1.5;
+  var dy=(t.clientY-dragLastY)/rect.height * 1.5;
+  dragLastX=t.clientX; dragLastY=t.clientY;
+  activeProd.offset.px=Math.max(-1,Math.min(1,(activeProd.offset.px||0)+dx));
+  activeProd.offset.py=Math.max(-1,Math.min(1,(activeProd.offset.py||0)-dy));
+  applyOffset(activeProd); syncAdminUI();
+},{passive:true});
+document.addEventListener('touchend', function(){dragging=false;});
+
+/* ══════════════════════════════════════════════════════
+   ADMIN PANEL
+   ══════════════════════════════════════════════════════ */
+document.addEventListener('keydown', function(e){
+  if(e.ctrlKey&&e.key==='0'){e.preventDefault();adminOpen=!adminOpen;adminEl.classList.toggle('open',adminOpen);if(adminOpen)syncAdminUI();}
+  if(e.ctrlKey&&e.key==='9'){e.preventDefault();toggleMaskDebug();}
+});
+document.getElementById('admin-close').addEventListener('click',function(){adminOpen=false;adminEl.classList.remove('open');});
+document.getElementById('env-mode').addEventListener('change',function(e){applyEnvMode(e.target.value);});
+document.getElementById('hdri-file-in').addEventListener('change',function(e){
+  var file=e.target.files[0];if(!file)return;
+  var url=URL.createObjectURL(file);
+  new THREE.TextureLoader().load(url,function(tex){
+    tex.mapping=THREE.EquirectangularReflectionMapping;
+    customEnvTex=tex; applyEnvMode('custom');
+    document.getElementById('env-mode').value='custom';
+  });
+  e.target.value='';
+});
+document.getElementById('offset-reset').addEventListener('click',function(){
+  if(!activeProd)return; activeProd.offset=defOff(); applyOffset(activeProd); syncAdminUI();
+});
+document.getElementById('clear-cat').addEventListener('click',function(){
+  catalogue.face=[]; catalogue.neck=[];
+  Object.keys(modelCache).forEach(function(k){scene.remove(modelCache[k]);});
+  modelCache={}; activeProd=null; faceAnchor.visible=false; aname.textContent='NO ITEM';
+  buildDefaults(); syncAdminUI();
+});
+
+function applyEnvMode(mode){
+  envMode=mode;
+  if(mode==='camera')  scene.environment=videoEnvTex;
+  if(mode==='builtin') scene.environment=builtinEnv;
+  if(mode==='custom')  scene.environment=customEnvTex||builtinEnv;
+}
+function buildEnvMap(){
+  var W=512,H=256,d=new Uint8Array(W*H*4);
+  for(var y=0;y<H;y++) for(var x=0;x<W;x++){
+    var i=(y*W+x)*4,nx=x/W,ny=y/H;
+    var dW=Math.sqrt((nx-.5)*(nx-.5)+(ny-.14)*(ny-.14));
+    var dP=Math.sqrt((nx-.14)*(nx-.14)+(ny-.45)*(ny-.45));
+    var dC=Math.sqrt((nx-.86)*(nx-.86)+(ny-.45)*(ny-.45));
+    var w=Math.max(0,1-dW*3.2);w*=w; var p=Math.max(0,1-dP*2.8);p*=p; var c=Math.max(0,1-dC*2.8);c*=c;
+    d[i]=Math.min(255,10+w*240+p*200);d[i+1]=Math.min(255,6+w*230+c*110);d[i+2]=Math.min(255,20+w*255+p*90+c*255);d[i+3]=255;
+  }
+  var t=new THREE.DataTexture(d,W,H,THREE.RGBAFormat);t.mapping=THREE.EquirectangularReflectionMapping;t.needsUpdate=true;return t;
+}
+
+function syncAdminUI(){
+  if(!activeProd||!activeProd.offset)return;
+  var o=activeProd.offset;
+  [['ox','oxv',o.px,function(v){return v.toFixed(3)}],
+   ['oy','oyv',o.py,function(v){return v.toFixed(3)}],
+   ['oz','ozv',o.pz,function(v){return v.toFixed(3)}],
+   ['rx','rxv',o.rx,function(v){return v+'°'}],
+   ['ry','ryv',o.ry,function(v){return v+'°'}],
+   ['rz','rzv',o.rz,function(v){return v+'°'}],
+   ['sc','scv',o.scale,function(v){return v.toFixed(2)+'x'}],
+   ['met','metv',o.met,function(v){return v.toFixed(2)}],
+   ['rgh','rghv',o.rgh,function(v){return v.toFixed(2)}],
+  ].forEach(function(f){
+    var el=document.getElementById(f[0]);if(el)el.value=f[2];
+    var ve=document.getElementById(f[1]);if(ve)ve.textContent=f[3](f[2]);
+  });
+}
+function bindSlider(id,vid,prop,fmt,matProp){
+  var el=document.getElementById(id);if(!el)return;
+  el.addEventListener('input',function(e){
+    var v=parseFloat(e.target.value);
+    var ve=document.getElementById(vid);if(ve)ve.textContent=fmt(v);
+    if(!activeProd||!activeProd.offset)return;
+    activeProd.offset[prop]=v;applyOffset(activeProd);
+    if(matProp){var m=modelCache[activeProd.id];if(m)m.traverse(function(c){if(c.isMesh&&c.material)c.material[matProp]=v;});}
+  });
+}
+bindSlider('ox','oxv','px',function(v){return v.toFixed(3)});
+bindSlider('oy','oyv','py',function(v){return v.toFixed(3)});
+bindSlider('oz','ozv','pz',function(v){return v.toFixed(3)});
+bindSlider('rx','rxv','rx',function(v){return v+'°'});
+bindSlider('ry','ryv','ry',function(v){return v+'°'});
+bindSlider('rz','rzv','rz',function(v){return v+'°'});
+bindSlider('sc','scv','scale',function(v){return v.toFixed(2)+'x'});
+bindSlider('met','metv','met',function(v){return v.toFixed(2)},'metalness');
+bindSlider('rgh','rghv','rgh',function(v){return v.toFixed(2)},'roughness');
+
+/* ══════════════════════════════════════════════════════
+   BAROQUE ORNAMENT OVERLAY
+   ══════════════════════════════════════════════════════ */
+var TAU=Math.PI*2;
+function petal(c,len,wid){c.beginPath();c.moveTo(0,0);c.bezierCurveTo(wid,-len*.3,wid*.9,-len*.75,0,-len);c.bezierCurveTo(-wid*.9,-len*.75,-wid,-len*.3,0,0);c.closePath();}
+function trefoil(c,r){[[0,0,r],[-r*1.3,r*.65,r*.6],[r*1.3,r*.65,r*.6]].forEach(function(v){c.beginPath();c.arc(v[0],v[1],v[2],0,TAU);c.fill();});}
+function scroll(c,sz,ang){c.save();c.rotate(ang);var r=sz*.18;c.beginPath();c.moveTo(r*.6,0);c.bezierCurveTo(r*1.3,-r*.2,r*1.5,-r,r*.4,-r*1.1);c.bezierCurveTo(-r*.3,-r*1.3,-r,-r*.7,-r*.5,-r*.1);c.lineWidth=sz*.026;c.stroke();c.beginPath();c.arc(r*.35,-r*.7,r*.18,Math.PI*.8,Math.PI*2.5);c.lineWidth=sz*.018;c.stroke();c.restore();}
+function oa(c,ang,len,wid,tip){c.save();c.rotate(ang);petal(c,len,wid);c.fill();if(tip){c.translate(0,-len);trefoil(c,wid*.5);}c.restore();}
+function drawOrn(c,x,y,sz){c.save();c.translate(x,y);var aL=sz,aLd=sz*.7,aW=sz*.175,aWd=sz*.12,sc=1.12;c.shadowColor='rgba(255,24,208,.95)';c.shadowBlur=sz*.25;c.fillStyle='#fff';for(var a=0;a<TAU;a+=Math.PI/2)oa(c,a,aL*sc,aW*sc,true);for(var b=Math.PI/4;b<TAU;b+=Math.PI/2)oa(c,b,aLd*sc,aWd*sc,false);c.beginPath();c.arc(0,0,sz*.26*sc,0,TAU);c.fill();c.shadowBlur=0;c.fillStyle='#ff18d0';for(var a2=0;a2<TAU;a2+=Math.PI/2)oa(c,a2,aL,aW,true);for(var b2=Math.PI/4;b2<TAU;b2+=Math.PI/2)oa(c,b2,aLd,aWd,false);c.beginPath();c.arc(0,0,sz*.26,0,TAU);c.fill();c.fillStyle='#a00075';c.globalAlpha=.72;for(var a3=0;a3<TAU;a3+=Math.PI/2){c.save();c.rotate(a3);petal(c,aL*.76,aW*.26);c.fill();c.restore();}c.globalAlpha=1;c.strokeStyle='rgba(255,255,255,.52)';for(var b3=Math.PI/4;b3<TAU;b3+=Math.PI/2)scroll(c,sz*.72,b3);c.strokeStyle='rgba(255,255,255,.44)';c.lineWidth=sz*.022;c.beginPath();c.arc(0,0,sz*.13,0,TAU);c.stroke();c.fillStyle='#fff';c.beginPath();c.arc(0,0,sz*.055,0,TAU);c.fill();for(var b4=Math.PI/4;b4<TAU;b4+=Math.PI/2){c.save();c.rotate(b4);c.translate(0,-aLd*.72);c.rotate(Math.PI/4);var ds=sz*.038;c.fillStyle='#fff';c.beginPath();c.moveTo(0,-ds);c.lineTo(ds,0);c.lineTo(0,ds);c.lineTo(-ds,0);c.closePath();c.fill();c.restore();}c.restore();}
+function drawCres(c,cx,cy,sz,fy){c.save();c.translate(cx,cy);if(fy)c.scale(1,-1);var r=sz*.48;function h(s){c.save();c.scale(s,1);c.beginPath();c.arc(r*.22,r*.3,r*.37,Math.PI*1.15,Math.PI*-.05);c.arc(r*.32,r*.28,r*.24,Math.PI*-.05,Math.PI*1.15,true);c.closePath();c.fill();c.restore();}c.shadowColor='rgba(255,24,208,.9)';c.shadowBlur=sz*.14;c.fillStyle='#fff';h(-1);h(1);c.beginPath();c.arc(0,r*.04,sz*.07,0,TAU);c.fill();c.shadowBlur=0;c.fillStyle='#ff18d0';h(-1);h(1);c.beginPath();c.arc(0,r*.04,sz*.058,0,TAU);c.fill();c.fillStyle='#fff';c.beginPath();c.arc(0,r*.04,sz*.03,0,TAU);c.fill();c.restore();}
+function drawOrnaments(){
+  var W=c2d.width,H=c2d.height;ctx2d.clearRect(0,0,W,H);if(!W||!H)return;
+  var sz=Math.min(W,H)*.27;
+  drawOrn(ctx2d,0,0,sz);drawOrn(ctx2d,W,0,sz);drawOrn(ctx2d,0,H,sz);drawOrn(ctx2d,W,H,sz);
+  drawCres(ctx2d,W/2,0,sz*.76,false);drawCres(ctx2d,W/2,H,sz*.76,true);
+  var ins=sz*.38,vs=16;ctx2d.strokeStyle='#ff18d0';ctx2d.lineWidth=2;ctx2d.shadowColor='rgba(255,24,208,.8)';ctx2d.shadowBlur=6;
+  [[ins,ins,1,1],[W-ins,ins,-1,1],[ins,H-ins,1,-1],[W-ins,H-ins,-1,-1]].forEach(function(v){ctx2d.beginPath();ctx2d.moveTo(v[0],v[1]+v[3]*vs);ctx2d.lineTo(v[0],v[1]);ctx2d.lineTo(v[0]+v[2]*vs,v[1]);ctx2d.stroke();});
+  ctx2d.shadowBlur=0;
+}
+
+/* ══════════════════════════════════════════════════════
+   CAMERA + MEDIAPIPE
+   ══════════════════════════════════════════════════════ */
+async function startCam(){
+  var old=video.srcObject;if(old)old.getTracks().forEach(function(t){t.stop();});
+  var s=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'}});
+  video.srcObject=s;
+  await new Promise(function(r){video.onloadedmetadata=r;});
+  await video.play();
+  resizeRenderer();
+}
+function resizeRenderer(){
+  var rect=vpEl.getBoundingClientRect();
+  vpW=Math.floor(rect.width)||800; vpH=Math.floor(rect.height)||600;
+  c3d.width=c2d.width=vpW; c3d.height=c2d.height=vpH;
+  if(renderer){renderer.setSize(vpW,vpH,false);camera.aspect=vpW/vpH;camera.updateProjectionMatrix();}
+  WORLD_W=WORLD_H*(vpW/vpH);
+}
+async function initDetectors(){
+  setLoad(18,'LOADING MEDIAPIPE...');
+  var mp=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
+  setLoad(22,'WASM RUNTIME...');
+  var vis=await mp.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+  setLoad(50,'FACE MESH + HEAD POSE...');
+  faceDet=await mp.FaceLandmarker.createFromOptions(vis,{
+    baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',delegate:'GPU'},
+    runningMode:'VIDEO',numFaces:1,outputFaceBlendshapes:false,outputFacialTransformationMatrixes:true
+  });
+  setLoad(82,'POSE ENGINE...');
+  poseDet=await mp.PoseLandmarker.createFromOptions(vis,{
+    baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',delegate:'GPU'},
+    runningMode:'VIDEO',numPoses:1
+  });
+  setLoad(100,'ALL SYSTEMS ONLINE');
+}
+
+/* ══════════════════════════════════════════════════════
+   RENDER LOOP
+   ══════════════════════════════════════════════════════ */
+function loop(){
+  requestAnimationFrame(loop);
+  if(video.readyState<2) return;
+  if(envMode==='camera'&&videoEnvTex) videoEnvTex.needsUpdate=true;
+  var ts=performance.now();
+  Object.keys(modelCache).forEach(function(k){if(modelCache[k].parent!==offsetGroup)modelCache[k].visible=false;});
+  var tracked=false;
+  if(activeProd&&activeProd.type==='face'&&faceDet){
+    var fr=faceDet.detectForVideo(video,ts);
+    var lm=fr.faceLandmarks&&fr.faceLandmarks[0];
+    var mx=fr.facialTransformationMatrixes&&fr.facialTransformationMatrixes[0];
+    tracked=applyFacePose(lm,mx);
+    updateFaceMesh(lm);
+    if(tracked)applyOffset(activeProd);
+    setStatus(tracked?'FACE LOCK':'SCANNING...',tracked);
+  } else if(activeProd&&activeProd.type==='neck'&&poseDet){
+    var pr=poseDet.detectForVideo(video,ts);
+    var lm2=pr.landmarks&&pr.landmarks[0];
+    tracked=applyNeckPose(lm2);
+    faceMeshObj.visible=false;
+    if(tracked)applyOffset(activeProd);
+    setStatus(tracked?'BODY LOCK':'SCANNING...',tracked);
+  } else {
+    faceAnchor.visible=false; faceMeshObj.visible=false;
+    setStatus('STANDBY',true);
+  }
+  drawOrnaments();
+  renderer.render(scene,camera);
+}
+
+function setLoad(p,m){lfill.style.width=p+'%';lmsg.textContent=m;}
+function setStatus(txt,ok){stext.textContent=txt;var c=ok?'#00ff88':'#ff9900';sdot.style.background=c;sdot.style.boxShadow='0 0 6px '+c;}
+
+document.getElementById('btn-cap').addEventListener('click',function(){
+  flashEl.classList.remove('fire');void flashEl.offsetWidth;flashEl.classList.add('fire');
+  var out=document.createElement('canvas');out.width=vpW;out.height=vpH;
+  var oc=out.getContext('2d');
+  oc.save();oc.scale(-1,1);oc.translate(-vpW,0);oc.drawImage(video,0,0,vpW,vpH);oc.restore();
+  oc.drawImage(c3d,0,0);oc.drawImage(c2d,0,0);
+  out.toBlob(function(b){var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='dynasty-look.png';a.click();},'image/png');
+});
+window.addEventListener('resize',function(){if(renderer)resizeRenderer();});
+
+/* ══════════════════════════════════════════════════════
+   BOOT
+   ══════════════════════════════════════════════════════ */
+async function boot(){
+  try{
+    setLoad(5,'REQUESTING CAMERA...');
+    await startCam();
+    setLoad(10,'STARTING 3D ENGINE...');
+    initThree();
+    buildDefaults();
+    setLoad(14,'LOADING AI MODELS...');
+    await initDetectors();
+    loadEl.classList.add('fade');
+    setTimeout(function(){loadEl.classList.add('gone');},700);
+    selectProd(catalogue.face[0]);
+    /* Fade out drag hint after 4s */
+    setTimeout(function(){dragHint.style.opacity='0';},4000);
+    loop();
+  }catch(err){
+    lmsg.textContent='ERROR: '+err.message;
+    lmsg.style.color='#ff4444';lfill.style.background='#ff4444';lfill.style.width='100%';
+    console.error('[dynasty.exe]',err);
+  }
+}
+boot();
+</script>
+</body>
+</html>

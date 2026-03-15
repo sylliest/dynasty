@@ -97,6 +97,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
   gap:0;
   pointer-events:none;
   padding-top:0;
+  overflow:visible;
 }
 .acc-cell{
   position:relative;
@@ -104,9 +105,14 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
   display:flex;flex-direction:column;align-items:center;
   justify-content:flex-end;padding-bottom:14px;
   cursor:pointer;pointer-events:all;
-  transition:border-color .18s,background .18s;
+  transition:border-color .18s,background .18s,transform .2s,box-shadow .2s;
+  transform-origin:center;z-index:1;
 }
-.acc-cell:hover{border-color:rgba(255,24,208,.45);background:rgba(255,24,208,.05)}
+.acc-cell:hover{
+  border-color:rgba(255,24,208,.7);background:rgba(255,24,208,.1);
+  transform:scale(1.08);z-index:10;
+  box-shadow:0 0 24px rgba(255,24,208,.35);
+}
 .acc-cell.selected{border:2px solid var(--pink);background:rgba(255,24,208,.08)}
 .acc-cell-name{font-family:var(--fnt);font-size:14px;letter-spacing:.35em;color:rgba(255,255,255,.65);margin-bottom:6px}
 .acc-cell-type{font-size:7px;color:rgba(255,24,208,.45);letter-spacing:.2em;margin-bottom:8px}
@@ -129,11 +135,13 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 .admin-kbd{font-size:7px;color:rgba(255,255,255,.18);text-align:center;letter-spacing:.1em}
 .admin-sect{border-top:1px solid rgba(255,24,208,.14);padding-top:10px}
 .admin-sect-lbl{font-family:var(--fnt);font-size:10px;letter-spacing:.4em;color:rgba(255,24,208,.5);display:block;margin-bottom:7px}
-.sr{display:flex;align-items:center;gap:8px;margin-bottom:5px}
-.sr label{font-size:8px;color:rgba(255,255,255,.35);letter-spacing:.12em;width:28px;flex-shrink:0;text-align:right}
-.sr input[type=range]{flex:1;height:2px;appearance:none;background:rgba(255,24,208,.2);border-radius:1px;outline:none;cursor:pointer}
-.sr input[type=range]::-webkit-slider-thumb{appearance:none;width:12px;height:12px;border-radius:50%;background:var(--pink);box-shadow:0 0 6px var(--pink);cursor:pointer}
-.sr span{font-size:7px;color:rgba(255,24,208,.7);width:36px;text-align:right;flex-shrink:0}
+/* +/- stepper rows replace sliders */
+.nr{display:flex;align-items:center;gap:0;margin-bottom:5px}
+.nr label{font-size:7px;color:rgba(255,255,255,.35);letter-spacing:.1em;width:30px;flex-shrink:0;text-align:right;margin-right:5px}
+.nb{width:22px;height:22px;background:transparent;border:1px solid rgba(255,24,208,.3);color:var(--pink);font-family:var(--mono);font-size:15px;cursor:pointer;flex-shrink:0;padding:0;display:flex;align-items:center;justify-content:center;transition:all .1s;user-select:none;line-height:1}
+.nb:hover{background:var(--pk3);border-color:var(--pink)}
+.nb:active{transform:scale(.88)}
+.nv{flex:1;text-align:center;font-size:8px;color:rgba(255,24,208,.9);letter-spacing:.08em;padding:0 4px;min-width:52px}
 .admin-btn{width:100%;background:transparent;border:1px solid rgba(255,24,208,.28);color:var(--pink);font-family:var(--fnt);font-size:11px;letter-spacing:.35em;padding:7px;cursor:pointer;transition:all .15s;margin-top:2px}
 .admin-btn:hover{background:var(--pk3);border-color:var(--pink)}
 .admin-btn.danger{border-color:rgba(255,50,50,.4);color:#ff5555}
@@ -174,25 +182,50 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
     <input type="file" id="import-file-in" accept=".stl,.obj,.glb,.gltf">
   </div>
   <div class="admin-sect">
-    <span class="admin-sect-lbl">ANCHOR OFFSET — drag viewport to move X/Y</span>
-    <div class="sr"><label>X</label><input type="range" id="ox" min="-1" max="1" step=".005" value="0"><span id="oxv">0.000</span></div>
-    <div class="sr"><label>Y</label><input type="range" id="oy" min="-1" max="1" step=".005" value="0"><span id="oyv">0.000</span></div>
-    <div class="sr"><label>Z</label><input type="range" id="oz" min="-1" max="1" step=".005" value="0"><span id="ozv">0.000</span></div>
-    <div class="sr"><label>RX</label><input type="range" id="rx" min="-180" max="180" step="1" value="0"><span id="rxv">0°</span></div>
-    <div class="sr"><label>RY</label><input type="range" id="ry" min="-180" max="180" step="1" value="0"><span id="ryv">0°</span></div>
-    <div class="sr"><label>RZ</label><input type="range" id="rz" min="-180" max="180" step="1" value="0"><span id="rzv">0°</span></div>
-    <div class="sr"><label>SC</label><input type="range" id="sc" min=".05" max="4" step=".01" value="1"><span id="scv">1.00x</span></div>
+    <span class="admin-sect-lbl">OBJECT POSITION</span>
+    <div class="nr"><label>X</label><button class="nb" id="ox-">−</button><span class="nv" id="oxv">0.000</span><button class="nb" id="ox+">+</button></div>
+    <div class="nr"><label>Y</label><button class="nb" id="oy-">−</button><span class="nv" id="oyv">0.000</span><button class="nb" id="oy+">+</button></div>
+    <div class="nr"><label>Z</label><button class="nb" id="oz-">−</button><span class="nv" id="ozv">0.000</span><button class="nb" id="oz+">+</button></div>
+    <div class="nr"><label>RX</label><button class="nb" id="rx-">−</button><span class="nv" id="rxv">0°</span><button class="nb" id="rx+">+</button></div>
+    <div class="nr"><label>RY</label><button class="nb" id="ry-">−</button><span class="nv" id="ryv">0°</span><button class="nb" id="ry+">+</button></div>
+    <div class="nr"><label>RZ</label><button class="nb" id="rz-">−</button><span class="nv" id="rzv">0°</span><button class="nb" id="rz+">+</button></div>
+    <span class="admin-sect-lbl" style="margin-top:6px;display:block">OBJECT SIZE</span>
+    <div class="nr"><label>W</label><button class="nb" id="scx-">−</button><span class="nv" id="scxv">1.00</span><button class="nb" id="scx+">+</button></div>
+    <div class="nr"><label>H</label><button class="nb" id="scy-">−</button><span class="nv" id="scyv">1.00</span><button class="nb" id="scy+">+</button></div>
+    <div class="nr"><label>D</label><button class="nb" id="scz-">−</button><span class="nv" id="sczv">1.00</span><button class="nb" id="scz+">+</button></div>
+    <div class="nr"><label>SC</label><button class="nb" id="sc-">−</button><span class="nv" id="scv">1.00x</span><button class="nb" id="sc+">+</button></div>
     <button class="admin-btn" id="offset-reset">RESET OFFSETS</button>
   </div>
   <div class="admin-sect">
     <span class="admin-sect-lbl">MATERIAL</span>
-    <div class="sr"><label>MET</label><input type="range" id="met" min="0" max="1" step=".01" value=".9"><span id="metv">0.90</span></div>
-    <div class="sr"><label>RGH</label><input type="range" id="rgh" min="0" max="1" step=".01" value=".1"><span id="rghv">0.10</span></div>
+    <div class="nr"><label>MET</label><button class="nb" id="met-">−</button><span class="nv" id="metv">0.90</span><button class="nb" id="met+">+</button></div>
+    <div class="nr"><label>RGH</label><button class="nb" id="rgh-">−</button><span class="nv" id="rghv">0.10</span><button class="nb" id="rgh+">+</button></div>
+  </div>
+  <div class="admin-sect">
+    <span class="admin-sect-lbl">MASK POSITION</span>
+    <div class="nr"><label>X</label><button class="nb" id="mx-">−</button><span class="nv" id="mxv">0.000</span><button class="nb" id="mx+">+</button></div>
+    <div class="nr"><label>Y</label><button class="nb" id="my-">−</button><span class="nv" id="myv">0.000</span><button class="nb" id="my+">+</button></div>
+    <div class="nr"><label>Z</label><button class="nb" id="mz-">−</button><span class="nv" id="mzv">0.000</span><button class="nb" id="mz+">+</button></div>
+    <div class="nr"><label>RX</label><button class="nb" id="mrx-">−</button><span class="nv" id="mrxv">0°</span><button class="nb" id="mrx+">+</button></div>
+    <div class="nr"><label>RY</label><button class="nb" id="mry-">−</button><span class="nv" id="mryv">0°</span><button class="nb" id="mry+">+</button></div>
+    <div class="nr"><label>RZ</label><button class="nb" id="mrz-">−</button><span class="nv" id="mrzv">0°</span><button class="nb" id="mrz+">+</button></div>
+    <span class="admin-sect-lbl" style="margin-top:6px;display:block">MASK SIZE</span>
+    <div class="nr"><label>W</label><button class="nb" id="mscx-">−</button><span class="nv" id="mscxv">1.00</span><button class="nb" id="mscx+">+</button></div>
+    <div class="nr"><label>H</label><button class="nb" id="mscy-">−</button><span class="nv" id="mscyv">1.00</span><button class="nb" id="mscy+">+</button></div>
+    <div class="nr"><label>D</label><button class="nb" id="mscz-">−</button><span class="nv" id="msczv">1.00</span><button class="nb" id="mscz+">+</button></div>
+    <div class="nr"><label>SC</label><button class="nb" id="msc-">−</button><span class="nv" id="mscv">1.000</span><button class="nb" id="msc+">+</button></div>
+    <button class="admin-btn" id="mask-reset">RESET MASK</button>
+  </div>
+  <div class="admin-sect">
+    <span class="admin-sect-lbl">LENS / CAMERA</span>
+    <div class="nr"><label>FOV</label><button class="nb" id="fov-">−</button><span class="nv" id="fovv">60°</span><button class="nb" id="fov+">+</button></div>
+    <div class="nr"><label>Z</label><button class="nb" id="fz-">−</button><span class="nv" id="fzv">-2.50</span><button class="nb" id="fz+">+</button></div>
+    <button class="admin-btn" id="lens-reset">RESET LENS</button>
   </div>
   <div class="admin-sect">
     <span class="admin-sect-lbl">ENVIRONMENT</span>
-    <div class="sr" style="margin-bottom:8px">
-      <label style="width:auto;color:rgba(255,24,208,.5);font-size:8px;letter-spacing:.12em">SRC</label>
+    <div class="nr" style="margin-bottom:8px">
+      <label style="width:auto;color:rgba(255,24,208,.5);font-size:8px;letter-spacing:.1em;margin-right:5px;flex-shrink:0">SRC</label>
       <select id="env-mode" style="flex:1;background:#06001a;border:1px solid rgba(255,24,208,.3);color:var(--pink);font-family:var(--fnt);font-size:11px;padding:3px 6px;outline:none;cursor:pointer">
         <option value="camera">CAMERA FEED</option>
         <option value="builtin">BUILT-IN STUDIO</option>
@@ -204,6 +237,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
   </div>
   <div class="admin-sect">
     <button class="admin-btn danger" id="clear-cat">CLEAR CATALOGUE</button>
+  </div>
+  <div class="admin-sect">
+    <span class="admin-sect-lbl">SCENE SETTINGS</span>
+    <button class="admin-btn" id="export-settings">EXPORT SETTINGS</button>
+    <label class="file-label" for="import-settings-in" style="margin-top:4px">IMPORT SETTINGS</label>
+    <input type="file" id="import-settings-in" accept=".json" style="display:none">
   </div>
   <button class="admin-btn" id="admin-close">CLOSE ADMIN</button>
 </div>
@@ -276,9 +315,11 @@ var vpEl      = document.getElementById('vp');
 var maskInd   = document.getElementById('mask-ind');
 var dragHint  = document.getElementById('drag-hint');
 
-/* ── CONSTANTS ── */
-var FOV    = 60;
-var FACE_Z = -2.5;
+/* ── CONSTANTS — defaults from dynasty-settings.json ── */
+var sceneFOV  = 6;
+var sceneFaceZ = -3.7;
+var FOV    = sceneFOV;
+var FACE_Z = sceneFaceZ;
 var DEG    = Math.PI / 180;
 var WORLD_H = 2 * Math.abs(FACE_Z) * Math.tan(FOV * DEG / 2);
 var WORLD_W = WORLD_H;
@@ -294,79 +335,22 @@ var customEnvTex = null, builtinEnv = null, videoEnvTex = null;
 var catalogue = { face:[], neck:[] };
 var modelCache = {};
 var scene, camera, renderer;
-var faceMeshPos, faceMeshGeo, faceMeshObj;
-var faceMeshMatOcc, faceMeshMatDbg;
+var faceMeshObj = null, faceMeshMatOcc, faceMeshMatDbg;
+var maskOffsetGroup = null;
+var maskOffset = {px:0, py:0, pz:0, rx:0, ry:-1, rz:-1, scale:1.0, scX:1.0, scY:1.05, scZ:0.4};
 
-/* ── FACE MESH LANDMARK ZONES ─────────────────────────────
-   We use 3 concentric rings + centroid to triangulate the face:
-   Ring 0 (OVAL)  — 36 silhouette points around face edge
-   Ring 1 (INNER) — 16 mid-face points (cheeks, brows, jaw)
-   Ring 2 (CORE)  — 8 central face points (nose, brow centre)
-   CENTROID       — single centre vertex (index = total lm count + 3)
-   Between each adjacent ring we stitch quads → 2 triangles each.
-   This gives a smooth, depth-varying face surface instead of a
-   single flat fan from centre → silhouette.
-   ────────────────────────────────────────────────────────── */
+/* OVAL landmarks — used both for the STL mask scale calc and for centroid */
 var OVAL_IDX = [
   10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,
   400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109
 ];
-/* Ring 1: mid-face — one point roughly between oval and core per sector */
-var INNER_IDX = [
-  9,299,333,334,296,285,  // right top arc
-  417,351,         // right jaw
-  396,369,         // chin
-  395,364,         // left jaw
-  266,330,         // left
-  8,107,66,105,63   // left top arc + forehead
-];
-/* Ring 2: core face surface points */
-var CORE_IDX = [
-  151,108,69,104,  // forehead/brow
-  68,104,69,108,   // inner brow
-  1,4,5,168,       // nose
-  175,199          // chin middle
-];
-/* CENTROID: index 470 (beyond the 468 mp landmarks + ring 1 count) */
-var CENTROID_IDX = 470;
 
-/* Build tri list by stitching Ring0↔Ring1, Ring1↔core, core→centroid */
-var FACE_FAN_TRIS = (function() {
-  var tris = [];
-  var N0 = OVAL_IDX.length;  // 36
-  var N1 = INNER_IDX.length; // ~13
+/* ── EMBEDDED face.stl (base64 binary STL) ── */
+var STL_FACE_B64 = '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';
 
-  /* Fan from centroid (idx 470) through ALL oval points — reversed winding
-     so front-face points TOWARD camera (Three.js default CCW = front) */
-  for (var i = 0; i < N0; i++) {
-    var a = OVAL_IDX[i];
-    var b = OVAL_IDX[(i + 1) % N0];
-    /* CCW when viewed from camera: centroid, next, current */
-    tris.push(CENTROID_IDX, b, a);
-  }
 
-  /* Additional face surface triangles using inner ring landmarks
-     These add depth variation — forehead, cheeks, jaw, nose */
-  /* Forehead strip */
-  tris.push(9,10,109,  9,109,67,  9,67,103,  9,103,54,
-            9,54,21,   9,21,162,  9,162,127, 9,127,234,
-            9,234,93,  9,93,132,  9,132,58,  9,58,172);
-  /* Right cheek */
-  tris.push(116,117,118, 50,116,118, 36,50,118, 36,118,119,
-            205,36,119,  205,119,120, 205,120,231);
-  /* Left cheek */
-  tris.push(345,346,347, 280,345,347, 266,280,347, 266,347,348,
-            425,266,348, 425,348,349, 425,349,451);
-  /* Nose bridge */
-  tris.push(168,6,197,   6,195,197,  195,5,197, 5,4,197,
-            4,1,197,     1,2,197,    2,98,197,  98,327,197);
-  /* Chin / jaw */
-  tris.push(152,175,148, 175,396,148, 396,377,148,
-            175,171,396, 171,396,395, 171,395,394,
-            175,148,176, 175,176,149);
+/* ── THREE.JS INIT ── */
 
-  return new Uint16Array(tris);
-})();
 
 /* ── THREE.JS INIT ── */
 function initThree() {
@@ -398,65 +382,133 @@ function initThree() {
   videoEnvTex.mapping   = THREE.EquirectangularReflectionMapping;
   videoEnvTex.minFilter = THREE.LinearFilter;
   videoEnvTex.magFilter = THREE.LinearFilter;
+  /* Flip U to match CSS scaleX(-1) mirror so reflections look like a real mirror */
+  videoEnvTex.repeat.set(-1,1); videoEnvTex.offset.set(1,0);
   applyEnvMode('camera');
 
   faceAnchor  = new THREE.Group(); scene.add(faceAnchor);
   offsetGroup = new THREE.Group(); faceAnchor.add(offsetGroup);
 
-  initFaceMesh();
+  initSTLFaceMask();
   WORLD_W = WORLD_H * (vpW/vpH);
 }
 
-/* ── FACE MESH (improved fan triangulation) ── */
-function initFaceMesh() {
-  /* Buffer: 471 slots — 468 mp landmarks + 3 spare → centroid at index 470 */
-  faceMeshPos = new Float32Array(471 * 3);
-  faceMeshGeo = new THREE.BufferGeometry();
-  faceMeshGeo.setAttribute('position', new THREE.BufferAttribute(faceMeshPos, 3));
-  faceMeshGeo.setIndex(new THREE.BufferAttribute(FACE_FAN_TRIS, 1));
+/* ── FACE MASK — STL occluder ── */
+function initSTLFaceMask() {
+  /* Decode embedded base64 STL → ArrayBuffer */
+  var bin = atob(STL_FACE_B64);
+  var buf = new ArrayBuffer(bin.length);
+  var u8 = new Uint8Array(buf);
+  for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
 
-  /* DoubleSide: writes depth regardless of winding, catches any camera angle */
+  var loader = new THREE.STLLoader();
+  var geo = loader.parse(buf);
+  geo.computeVertexNormals();
+
+  /* Centre + normalise so face WIDTH (X axis) = 1.0 world unit */
+  geo.computeBoundingBox();
+  var bb = geo.boundingBox;
+  var cx = (bb.max.x + bb.min.x) / 2;
+  var cy = (bb.max.y + bb.min.y) / 2;
+  var cz = (bb.max.z + bb.min.z) / 2;
+  var xRange = Math.max(bb.max.x - bb.min.x, 0.0001);
+  /* Translate to origin then scale */
+  geo.translate(-cx, -cy, -cz);
+  geo.scale(1 / xRange, 1 / xRange, 1 / xRange);
+
   faceMeshMatOcc = new THREE.MeshBasicMaterial({
     colorWrite: false, side: THREE.DoubleSide,
     depthWrite: true,  depthTest: true
   });
   faceMeshMatDbg = new THREE.MeshBasicMaterial({
-    color: 0xff18d0, transparent: true, opacity: 0.32,
+    color: 0xff18d0, transparent: true, opacity: 0.38,
     side: THREE.DoubleSide, wireframe: false,
     depthWrite: true, depthTest: true
   });
 
-  faceMeshObj = new THREE.Mesh(faceMeshGeo, faceMeshMatOcc);
+  faceMeshObj = new THREE.Mesh(geo, faceMeshMatOcc);
   faceMeshObj.renderOrder = 0;
   faceMeshObj.frustumCulled = false;
   faceMeshObj.visible = false;
-  scene.add(faceMeshObj);
+
+  /* Two-group structure:
+     maskAnchor  → scene:  receives live centroid + head-pose rotation + oval scale
+     maskOffsetGroup → maskAnchor: receives user's offset/rotation nudges in face-local space */
+  window._maskScaleGroup = new THREE.Group();
+  window._maskScaleGroup.add(faceMeshObj);
+
+  maskOffsetGroup = new THREE.Group();      /* receives user px/py/pz in world-scale units */
+  maskOffsetGroup.add(window._maskScaleGroup);
+
+  window._maskAnchor = new THREE.Group();   /* receives centroid pos + head-pose rot only */
+  window._maskAnchor.add(maskOffsetGroup);
+  scene.add(window._maskAnchor);
 }
 
-function updateFaceMesh(lm) {
-  if (!lm || lm.length < 468) { faceMeshObj.visible = false; return; }
+/* Per-frame mask update — three-group hierarchy so offsets are scale-independent:
+   _maskAnchor   (scene child): centroid pos + head-pose quaternion — NO scale
+   maskOffsetGroup (_maskAnchor child): user px/py/pz + rx/ry/rz — in unscaled face coords
+   _maskScaleGroup (maskOffsetGroup child): oval W/H/D scale — never seen by offset group
+   This means a px offset of 0.05 is always 0.05 world units regardless of face distance. */
+function updateSTLFaceMask(lm, mx) {
+  var anchor = window._maskAnchor;
+  var scaleGrp = window._maskScaleGroup;
+  if (!lm || lm.length < 468 || !faceMeshObj || !anchor || !scaleGrp) {
+    if (faceMeshObj) faceMeshObj.visible = false;
+    if (anchor) anchor.visible = false;
+    return;
+  }
   faceMeshObj.visible = true;
+  anchor.visible = true;
 
-  for (var i = 0; i < 468; i++) {
-    var p = lm[i];
-    faceMeshPos[i*3+0] = -(p.x - 0.5) * WORLD_W;
-    faceMeshPos[i*3+1] = -(p.y - 0.5) * WORLD_H;
-    /* depth multiplier 3.2 → nose protrudes enough to occlude glasses bridge */
-    faceMeshPos[i*3+2] = FACE_Z - p.z * WORLD_W * 3.2;
+  /* ── Oval centroid ── */
+  var cx=0,cy=0,cz=0, minX=1,maxX=0,minY=1,maxY=0;
+  for (var k=0;k<OVAL_IDX.length;k++){
+    var ov=lm[OVAL_IDX[k]];
+    cx+=ov.x; cy+=ov.y; cz+=ov.z;
+    if(ov.x<minX)minX=ov.x; if(ov.x>maxX)maxX=ov.x;
+    if(ov.y<minY)minY=ov.y; if(ov.y>maxY)maxY=ov.y;
+  }
+  var on=OVAL_IDX.length; cx/=on; cy/=on; cz/=on;
+
+  /* ── _maskAnchor: world pos + head-pose rotation, NO scale ── */
+  var faceZdyn = FACE_Z - cz * WORLD_W * 2.4;
+  anchor.position.set(-(cx-0.5)*WORLD_W, -(cy-0.5)*WORLD_H, faceZdyn);
+  anchor.scale.set(1,1,1); /* always 1 — scale lives in _maskScaleGroup */
+
+  if (mx && mx.data) {
+    var d=mx.data;
+    _mat4.set(d[0],d[4],d[8],0, d[1],d[5],d[9],0, d[2],d[6],d[10],0, 0,0,0,1);
+    _qRaw.setFromRotationMatrix(_mat4);
+    anchor.quaternion.set(_qRaw.x, -_qRaw.y, -_qRaw.z, _qRaw.w);
   }
 
-  /* Centroid at CENTROID_IDX (470) = average of oval points */
-  var cx=0, cy=0, cz=0;
-  for (var k = 0; k < OVAL_IDX.length; k++) {
-    var lk = lm[OVAL_IDX[k]]; cx += lk.x; cy += lk.y; cz += lk.z;
-  }
-  var n = OVAL_IDX.length; cx/=n; cy/=n; cz/=n;
-  faceMeshPos[CENTROID_IDX*3+0] = -(cx - 0.5) * WORLD_W;
-  faceMeshPos[CENTROID_IDX*3+1] = -(cy - 0.5) * WORLD_H;
-  faceMeshPos[CENTROID_IDX*3+2] = FACE_Z - cz * WORLD_W * 3.2;
+  /* ── maskOffsetGroup: user offsets — purely positional/rotational, no scale ── */
+  maskOffsetGroup.position.set(maskOffset.px, maskOffset.py, maskOffset.pz);
+  maskOffsetGroup.rotation.set(maskOffset.rx*DEG, maskOffset.ry*DEG, maskOffset.rz*DEG);
+  maskOffsetGroup.scale.set(1,1,1);
 
-  faceMeshGeo.attributes.position.needsUpdate = true;
-  faceMeshGeo.computeBoundingSphere();
+  /* ── _maskScaleGroup: face oval dimensions — this is the only place scale lives ── */
+  var faceW = Math.max((maxX-minX)*WORLD_W, 0.001);
+  var faceH = Math.max((maxY-minY)*WORLD_H, 0.001);
+  var noseTip=lm[4], forehead=lm[10];
+  var faceD = Math.max(Math.abs((noseTip?noseTip.z:0)-(forehead?forehead.z:0))*WORLD_W*4.0, faceW*0.3);
+
+  scaleGrp.scale.set(
+    faceW * maskOffset.scale * (maskOffset.scX||1),
+    faceH * maskOffset.scale * (maskOffset.scY||1),
+    faceD * maskOffset.scale * (maskOffset.scZ||1)
+  );
+  scaleGrp.position.set(0,0,0);
+  scaleGrp.rotation.set(0,0,0);
+}
+
+function applyMaskOffset() {
+  if (!maskOffsetGroup) return;
+  maskOffsetGroup.position.set(maskOffset.px, maskOffset.py, maskOffset.pz);
+  maskOffsetGroup.rotation.set(
+    maskOffset.rx * DEG, maskOffset.ry * DEG, maskOffset.rz * DEG
+  );
 }
 
 function toggleMaskDebug() {
@@ -528,7 +580,7 @@ function makeNecklace(color, met, rgh) {
   return g;
 }
 
-function defOff() { return {px:0,py:0,pz:0,rx:0,ry:0,rz:0,scale:1,met:.9,rgh:.1}; }
+function defOff() { return {px:0,py:0,pz:0,rx:0,ry:0,rz:0,scale:1,scX:1,scY:1,scZ:1,met:.9,rgh:.1}; }
 
 function buildDefaults() {
   var f=[
@@ -552,22 +604,30 @@ var _qRaw = new THREE.Quaternion();
 
 function applyFacePose(lm, mx) {
   if (!lm || lm.length < 468) { faceAnchor.visible=false; return false; }
-  var eL=lm[33], eR=lm[263];
-  if (!eL||!eR) { faceAnchor.visible=false; return false; }
 
-  /* Position: midpoint of outer eye corners */
+  /* Face centroid (oval average) — better anchor than eye midpoint when looking up */
+  var cx=0,cy=0,cz=0;
+  for (var ki=0;ki<OVAL_IDX.length;ki++){var p=lm[OVAL_IDX[ki]];cx+=p.x;cy+=p.y;cz+=p.z;}
+  var on=OVAL_IDX.length; cx/=on; cy/=on; cz/=on;
+
+  /* Dynamic FACE_Z: centroid Z maps to 3D depth so the anchor tracks real face depth */
+  var faceZdyn = FACE_Z - cz * WORLD_W * 2.4;
+
   faceAnchor.position.set(
-    -((eL.x+eR.x)*0.5 - 0.5) * WORLD_W,
-    -((eL.y+eR.y)*0.5 - 0.5) * WORLD_H,
-    FACE_Z
+    -(cx - 0.5) * WORLD_W,
+    -(cy - 0.5) * WORLD_H,
+    faceZdyn
   );
 
-  /* Scale: true 3D eye span (stable when head turns) */
-  var dx=(eR.x-eL.x)*WORLD_W, dy=(eR.y-eL.y)*WORLD_H, dz=(eR.z-eL.z)*WORLD_W;
+  /* Scale: 3D span between widest cheek points (stable across pitch/roll) */
+  var lCh=lm[234], rCh=lm[454];
+  if (!lCh||!rCh){faceAnchor.visible=false;return false;}
+  var dx=(rCh.x-lCh.x)*WORLD_W, dy=(rCh.y-lCh.y)*WORLD_H, dz=(rCh.z-lCh.z)*WORLD_W;
   var span3D = Math.max(Math.sqrt(dx*dx+dy*dy+dz*dz), 0.001);
-  faceAnchor.scale.setScalar(span3D / (GLASSES_OUTER_SPAN * 0.60));
+  /* Normalize: STL face width = 1 world unit; cheek span ~ 0.88× face width */
+  faceAnchor.scale.setScalar(span3D / (GLASSES_OUTER_SPAN * 0.58));
 
-  /* Rotation: 4×4 head-pose matrix */
+  /* Rotation: full 4×4 head-pose matrix — correct for all angles incl. pitch up/down */
   if (mx && mx.data) {
     var d=mx.data;
     _mat4.set(d[0],d[4],d[8],0, d[1],d[5],d[9],0, d[2],d[6],d[10],0, 0,0,0,1);
@@ -595,7 +655,8 @@ function applyOffset(prod) {
   var o=prod.offset;
   offsetGroup.position.set(o.px,o.py,o.pz);
   offsetGroup.rotation.set(o.rx*DEG,o.ry*DEG,o.rz*DEG);
-  offsetGroup.scale.setScalar(o.scale);
+  var sx=(o.scX||1)*o.scale, sy=(o.scY||1)*o.scale, sz=(o.scZ||1)*o.scale;
+  offsetGroup.scale.set(sx,sy,sz);
 }
 
 function setActiveModel(prod) {
@@ -629,10 +690,24 @@ function openAccModal() {
 function closeAccModal() {
   accModal.classList.add('hidden');
   if(modalRAF){cancelAnimationFrame(modalRAF);modalRAF=null;}
+  /* Dispose GPU resources for every cloned model — each open→close was leaking. */
+  modalItems.forEach(function(item){
+    if(!item.model) return;
+    item.model.traverse(function(c){
+      if(!c.isMesh) return;
+      if(c.geometry) c.geometry.dispose();
+      if(Array.isArray(c.material)) c.material.forEach(function(m){if(m)m.dispose();});
+      else if(c.material) c.material.dispose();
+    });
+  });
+  modalItems=[];
   if(modalRenderer){modalRenderer.dispose();modalRenderer=null;}
 }
 
 function buildModalItems() {
+  /* Cancel any running loop BEFORE touching the renderer so the old RAF
+     cannot fire with the newly-created renderer or scene mid-rebuild. */
+  if(modalRAF){cancelAnimationFrame(modalRAF);modalRAF=null;}
   var accCanvas = document.getElementById('acc-canvas');
   var grid = document.getElementById('acc-grid');
   grid.innerHTML='';
@@ -746,6 +821,9 @@ function startModalRender() {
     modalRenderer.clear();
     modalItems.forEach(function(item) {
       if (!item.model) return;
+      /* Hide all other models so only this item appears in its scissor cell */
+      modalItems.forEach(function(o){ if(o.model) o.model.visible=false; });
+      item.model.visible=true;
       item.angle += 0.012;
       item.model.rotation.y = item.angle;
       modalRenderer.setViewport(item.vx, item.vy, item.vw, item.vh);
@@ -804,7 +882,13 @@ document.getElementById('import-file-in').addEventListener('change', function(e)
       if(c.isMesh){
         c.geometry.computeVertexNormals();
         /* Preserve existing textures/materials from GLB/OBJ; only set fallback if none */
-        if(!c.material || Array.isArray(c.material) ? false : !c.material.map && !c.material.color) {
+        /* Apply metallic fallback only to meshes with no texture and no custom colour.
+           Bug fix: c.material.color is always a THREE.Color object (truthy),
+           so we must inspect its channel values, not test it as a boolean. */
+        var _c = c.material && !Array.isArray(c.material) && c.material.color;
+        var _customCol = _c && (_c.r > 0.05 || _c.g > 0.05 || _c.b > 0.05) &&
+                         !(_c.r > 0.97 && _c.g > 0.97 && _c.b > 0.97);
+        if (c.material && !Array.isArray(c.material) && !c.material.map && !_customCol) {
           c.material=new THREE.MeshPhysicalMaterial({color:0xc8d8f0,metalness:.9,roughness:.08,reflectivity:1,envMapIntensity:1.8});
         }
         if(c.material && !Array.isArray(c.material)) {
@@ -895,6 +979,7 @@ document.addEventListener('touchmove', function(e){
   applyOffset(activeProd); syncAdminUI();
 },{passive:true});
 document.addEventListener('touchend', function(){dragging=false;});
+document.addEventListener('touchcancel', function(){dragging=false;vpEl.style.cursor='crosshair';});
 
 /* ══════════════════════════════════════════════════════
    ADMIN PANEL
@@ -927,9 +1012,15 @@ document.getElementById('clear-cat').addEventListener('click',function(){
 
 function applyEnvMode(mode){
   envMode=mode;
-  if(mode==='camera')  scene.environment=videoEnvTex;
-  if(mode==='builtin') scene.environment=builtinEnv;
-  if(mode==='custom')  scene.environment=customEnvTex||builtinEnv;
+  if(mode==='camera')  {scene.environment=videoEnvTex;}
+  if(mode==='builtin') {scene.environment=builtinEnv;}
+  if(mode==='custom')  {scene.environment=customEnvTex||builtinEnv;}
+}
+function applyFOV(){
+  FOV = sceneFOV; FACE_Z = sceneFaceZ;
+  WORLD_H = 2*Math.abs(FACE_Z)*Math.tan(FOV*DEG/2);
+  WORLD_W = WORLD_H*(vpW/vpH);
+  if(camera){camera.fov=FOV; camera.updateProjectionMatrix();}
 }
 function buildEnvMap(){
   var W=512,H=256,d=new Uint8Array(W*H*4);
@@ -945,41 +1036,174 @@ function buildEnvMap(){
 }
 
 function syncAdminUI(){
-  if(!activeProd||!activeProd.offset)return;
-  var o=activeProd.offset;
-  [['ox','oxv',o.px,function(v){return v.toFixed(3)}],
-   ['oy','oyv',o.py,function(v){return v.toFixed(3)}],
-   ['oz','ozv',o.pz,function(v){return v.toFixed(3)}],
-   ['rx','rxv',o.rx,function(v){return v+'°'}],
-   ['ry','ryv',o.ry,function(v){return v+'°'}],
-   ['rz','rzv',o.rz,function(v){return v+'°'}],
-   ['sc','scv',o.scale,function(v){return v.toFixed(2)+'x'}],
-   ['met','metv',o.met,function(v){return v.toFixed(2)}],
-   ['rgh','rghv',o.rgh,function(v){return v.toFixed(2)}],
-  ].forEach(function(f){
-    var el=document.getElementById(f[0]);if(el)el.value=f[2];
-    var ve=document.getElementById(f[1]);if(ve)ve.textContent=f[3](f[2]);
-  });
+  /* Accessory offsets */
+  if(activeProd&&activeProd.offset){
+    var o=activeProd.offset;
+    setNv('oxv', o.px.toFixed(3));
+    setNv('oyv', o.py.toFixed(3));
+    setNv('ozv', o.pz.toFixed(3));
+    setNv('rxv', o.rx+'°');
+    setNv('ryv', o.ry+'°');
+    setNv('rzv', o.rz+'°');
+    setNv('scxv',(o.scX||1).toFixed(2));
+    setNv('scyv',(o.scY||1).toFixed(2));
+    setNv('sczv',(o.scZ||1).toFixed(2));
+    setNv('scv', o.scale.toFixed(2)+'x');
+    setNv('metv',o.met.toFixed(2));
+    setNv('rghv',o.rgh.toFixed(2));
+  }
+  /* Mask offsets */
+  setNv('mxv',  maskOffset.px.toFixed(3));
+  setNv('myv',  maskOffset.py.toFixed(3));
+  setNv('mzv',  maskOffset.pz.toFixed(3));
+  setNv('mrxv', maskOffset.rx.toFixed(1)+'°');
+  setNv('mryv', maskOffset.ry.toFixed(1)+'°');
+  setNv('mrzv', maskOffset.rz.toFixed(1)+'°');
+  setNv('mscxv',(maskOffset.scX||1).toFixed(2));
+  setNv('mscyv',(maskOffset.scY||1).toFixed(2));
+  setNv('msczv',(maskOffset.scZ||1).toFixed(2));
+  setNv('mscv', maskOffset.scale.toFixed(3));
+  /* Lens */
+  setNv('fovv', sceneFOV.toFixed(0)+'°');
+  setNv('fzv',  sceneFaceZ.toFixed(2));
 }
-function bindSlider(id,vid,prop,fmt,matProp){
-  var el=document.getElementById(id);if(!el)return;
-  el.addEventListener('input',function(e){
-    var v=parseFloat(e.target.value);
-    var ve=document.getElementById(vid);if(ve)ve.textContent=fmt(v);
-    if(!activeProd||!activeProd.offset)return;
-    activeProd.offset[prop]=v;applyOffset(activeProd);
-    if(matProp){var m=modelCache[activeProd.id];if(m)m.traverse(function(c){if(c.isMesh&&c.material)c.material[matProp]=v;});}
-  });
+function setNv(id, txt){var el=document.getElementById(id);if(el)el.textContent=txt;}
+
+/* +/− stepper with HOLD-TO-REPEAT: tap fires once, hold accelerates */
+function bindStepper(prefix, vid, getObj, prop, step, fmt, matProp) {
+  function adjust(delta) {
+    var obj = getObj(); if(!obj) return;
+    var raw = parseFloat(obj[prop]) || 0;
+    obj[prop] = parseFloat((raw + delta).toFixed(6));
+    setNv(vid, fmt(obj[prop]));
+    if (matProp && activeProd) {
+      var m = modelCache[activeProd.id];
+      if (m) m.traverse(function(c){if(c.isMesh&&c.material)c.material[matProp]=obj[prop];});
+    }
+    if (getObj() === (activeProd&&activeProd.offset)) applyOffset(activeProd);
+    if (getObj() === maskOffset) applyMaskOffset();
+  }
+  function attachHold(el, delta) {
+    if (!el) return;
+    var holdT=null, holdI=null;
+    function start(e){
+      if(e.cancelable)e.preventDefault();
+      adjust(delta);
+      holdT=setTimeout(function(){
+        holdI=setInterval(function(){adjust(delta);},60);
+      },350);
+    }
+    function stop(){clearTimeout(holdT);clearInterval(holdI);holdT=holdI=null;}
+    el.addEventListener('mousedown',start);
+    el.addEventListener('touchstart',start,{passive:false});
+    el.addEventListener('mouseup',stop);
+    el.addEventListener('mouseleave',stop);
+    el.addEventListener('touchend',stop);
+    el.addEventListener('touchcancel',stop);
+  }
+  attachHold(document.getElementById(prefix+'-'), -step);
+  attachHold(document.getElementById(prefix+'+'), +step);
 }
-bindSlider('ox','oxv','px',function(v){return v.toFixed(3)});
-bindSlider('oy','oyv','py',function(v){return v.toFixed(3)});
-bindSlider('oz','ozv','pz',function(v){return v.toFixed(3)});
-bindSlider('rx','rxv','rx',function(v){return v+'°'});
-bindSlider('ry','ryv','ry',function(v){return v+'°'});
-bindSlider('rz','rzv','rz',function(v){return v+'°'});
-bindSlider('sc','scv','scale',function(v){return v.toFixed(2)+'x'});
-bindSlider('met','metv','met',function(v){return v.toFixed(2)},'metalness');
-bindSlider('rgh','rghv','rgh',function(v){return v.toFixed(2)},'roughness');
+
+/* Accessory offset steppers */
+var accOff = function(){ return activeProd&&activeProd.offset; };
+bindStepper('ox','oxv', accOff,'px',  0.005, function(v){return v.toFixed(3);});
+bindStepper('oy','oyv', accOff,'py',  0.005, function(v){return v.toFixed(3);});
+bindStepper('oz','ozv', accOff,'pz',  0.005, function(v){return v.toFixed(3);});
+bindStepper('rx','rxv', accOff,'rx',  1,     function(v){return v+'°';});
+bindStepper('ry','ryv', accOff,'ry',  1,     function(v){return v+'°';});
+bindStepper('rz','rzv', accOff,'rz',  1,     function(v){return v+'°';});
+bindStepper('sc','scv', accOff,'scale',0.01, function(v){return parseFloat(v).toFixed(2)+'x';});
+bindStepper('met','metv',accOff,'met',0.01, function(v){return parseFloat(v).toFixed(2);},'metalness');
+bindStepper('rgh','rghv',accOff,'rgh',0.01, function(v){return parseFloat(v).toFixed(2);},'roughness');
+
+/* Mask offset steppers */
+var mOff = function(){ return maskOffset; };
+bindStepper('mx', 'mxv',  mOff,'px',    0.005, function(v){return parseFloat(v).toFixed(3);});
+bindStepper('my', 'myv',  mOff,'py',    0.005, function(v){return parseFloat(v).toFixed(3);});
+bindStepper('mz', 'mzv',  mOff,'pz',    0.005, function(v){return parseFloat(v).toFixed(3);});
+bindStepper('mrx','mrxv', mOff,'rx',    1,     function(v){return parseFloat(v).toFixed(1)+'°';});
+bindStepper('mry','mryv', mOff,'ry',    1,     function(v){return parseFloat(v).toFixed(1)+'°';});
+bindStepper('mrz','mrzv', mOff,'rz',    1,     function(v){return parseFloat(v).toFixed(1)+'°';});
+bindStepper('msc','mscv', mOff,'scale', 0.005, function(v){return parseFloat(v).toFixed(3);});
+
+bindStepper('scx','scxv', accOff,'scX',  0.01, function(v){return parseFloat(v).toFixed(2);});
+bindStepper('scy','scyv', accOff,'scY',  0.01, function(v){return parseFloat(v).toFixed(2);});
+bindStepper('scz','sczv', accOff,'scZ',  0.01, function(v){return parseFloat(v).toFixed(2);});
+
+/* Mask size steppers */
+bindStepper('mscx','mscxv',mOff,'scX',  0.01, function(v){return parseFloat(v).toFixed(2);});
+bindStepper('mscy','mscyv',mOff,'scY',  0.01, function(v){return parseFloat(v).toFixed(2);});
+bindStepper('mscz','msczv',mOff,'scZ',  0.01, function(v){return parseFloat(v).toFixed(2);});
+
+/* Lens steppers */
+var lensObj = {get fov(){return sceneFOV;}, set fov(v){sceneFOV=v;applyFOV();},
+               get fz(){return sceneFaceZ;}, set fz(v){sceneFaceZ=v;applyFOV();}};
+function bindLensStepper(prefix,vid,prop,step,fmt){
+  function adjust(delta){
+    lensObj[prop]=parseFloat((lensObj[prop]+delta).toFixed(6));
+    setNv(vid,fmt(lensObj[prop]));
+    applyFOV(); syncAdminUI();
+  }
+  function attachHold(el,d){
+    if(!el)return;
+    var t=null,i=null;
+    function start(e){if(e.cancelable)e.preventDefault();adjust(d);t=setTimeout(function(){i=setInterval(function(){adjust(d);},60);},350);}
+    function stop(){clearTimeout(t);clearInterval(i);t=i=null;}
+    el.addEventListener('mousedown',start);el.addEventListener('touchstart',start,{passive:false});
+    el.addEventListener('mouseup',stop);el.addEventListener('mouseleave',stop);
+    el.addEventListener('touchend',stop);el.addEventListener('touchcancel',stop);
+  }
+  attachHold(document.getElementById(prefix+'-'),-step);
+  attachHold(document.getElementById(prefix+'+'),+step);
+}
+bindLensStepper('fov','fovv','fov',1, function(v){return Math.round(v)+'°';});
+bindLensStepper('fz', 'fzv', 'fz',0.05, function(v){return parseFloat(v).toFixed(2);});
+
+document.getElementById('lens-reset').addEventListener('click',function(){
+  sceneFOV=60; sceneFaceZ=-2.5; applyFOV(); syncAdminUI();
+});
+
+document.getElementById('mask-reset').addEventListener('click',function(){
+  maskOffset={px:0,py:0,pz:0,rx:0,ry:0,rz:0,scale:1.0,scX:1.0,scY:1.0,scZ:1.0};
+  applyMaskOffset(); syncAdminUI();
+});
+
+/* ── EXPORT / IMPORT SCENE SETTINGS ── */
+document.getElementById('export-settings').addEventListener('click',function(){
+  var data = {
+    version:1,
+    sceneFOV: sceneFOV,
+    sceneFaceZ: sceneFaceZ,
+    maskOffset: JSON.parse(JSON.stringify(maskOffset))
+  };
+  var blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'dynasty-settings.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+document.getElementById('import-settings-in').addEventListener('change',function(e){
+  var file=e.target.files[0]; if(!file)return;
+  e.target.value='';
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      var data=JSON.parse(ev.target.result);
+      if(data.sceneFOV  !==undefined){sceneFOV   =data.sceneFOV;  applyFOV();}
+      if(data.sceneFaceZ!==undefined){sceneFaceZ =data.sceneFaceZ;applyFOV();}
+      if(data.maskOffset!==undefined){
+        Object.assign(maskOffset,data.maskOffset);
+        applyMaskOffset();
+      }
+      syncAdminUI();
+    }catch(err){lmsg.textContent='IMPORT ERROR: '+err.message;lmsg.style.color='#ff4444';}
+  };
+  reader.readAsText(file);
+});
+
+
 
 /* ══════════════════════════════════════════════════════
    BAROQUE ORNAMENT OVERLAY
@@ -1047,23 +1271,30 @@ function loop(){
   var ts=performance.now();
   Object.keys(modelCache).forEach(function(k){if(modelCache[k].parent!==offsetGroup)modelCache[k].visible=false;});
   var tracked=false;
-  if(activeProd&&activeProd.type==='face'&&faceDet){
+  if(faceDet){
     var fr=faceDet.detectForVideo(video,ts);
     var lm=fr.faceLandmarks&&fr.faceLandmarks[0];
     var mx=fr.facialTransformationMatrixes&&fr.facialTransformationMatrixes[0];
-    tracked=applyFacePose(lm,mx);
-    updateFaceMesh(lm);
-    if(tracked)applyOffset(activeProd);
-    setStatus(tracked?'FACE LOCK':'SCANNING...',tracked);
-  } else if(activeProd&&activeProd.type==='neck'&&poseDet){
-    var pr=poseDet.detectForVideo(video,ts);
-    var lm2=pr.landmarks&&pr.landmarks[0];
-    tracked=applyNeckPose(lm2);
-    faceMeshObj.visible=false;
-    if(tracked)applyOffset(activeProd);
-    setStatus(tracked?'BODY LOCK':'SCANNING...',tracked);
+    /* always run mask update with mx so rotation is correct */
+    updateSTLFaceMask(lm, mx);
+    if(activeProd&&activeProd.type==='face'){
+      tracked=applyFacePose(lm,mx);
+      if(tracked)applyOffset(activeProd);
+      setStatus(tracked?'FACE LOCK':'SCANNING...',tracked);
+    } else if(activeProd&&activeProd.type==='neck'&&poseDet){
+      var pr=poseDet.detectForVideo(video,ts);
+      var lm2=pr.landmarks&&pr.landmarks[0];
+      tracked=applyNeckPose(lm2);
+      applyFacePose(lm,mx);
+      if(tracked)applyOffset(activeProd);
+      setStatus(tracked?'BODY LOCK':'SCANNING...',tracked);
+    } else {
+      applyFacePose(lm,mx);
+      setStatus('STANDBY',true);
+    }
   } else {
-    faceAnchor.visible=false; faceMeshObj.visible=false;
+    if(faceMeshObj) faceMeshObj.visible=false;
+    if(window._maskAnchor) window._maskAnchor.visible=false;
     setStatus('STANDBY',true);
   }
   drawOrnaments();
@@ -1077,8 +1308,13 @@ document.getElementById('btn-cap').addEventListener('click',function(){
   flashEl.classList.remove('fire');void flashEl.offsetWidth;flashEl.classList.add('fire');
   var out=document.createElement('canvas');out.width=vpW;out.height=vpH;
   var oc=out.getContext('2d');
-  oc.save();oc.scale(-1,1);oc.translate(-vpW,0);oc.drawImage(video,0,0,vpW,vpH);oc.restore();
-  oc.drawImage(c3d,0,0);oc.drawImage(c2d,0,0);
+  /* All three layers were rendered in mirror-space (matching the CSS-flipped
+     video element), so un-mirror all of them together when compositing. */
+  oc.save();oc.scale(-1,1);oc.translate(-vpW,0);
+  oc.drawImage(video,0,0,vpW,vpH);
+  oc.drawImage(c3d,0,0);
+  oc.drawImage(c2d,0,0);
+  oc.restore();
   out.toBlob(function(b){var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='dynasty-look.png';a.click();},'image/png');
 });
 window.addEventListener('resize',function(){if(renderer)resizeRenderer();});

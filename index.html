@@ -335,6 +335,7 @@ var customEnvTex = null, builtinEnv = null, videoEnvTex = null;
 var catalogue = { face:[], neck:[] };
 var modelCache = {};
 var scene, camera, renderer;
+var cubeRenderTarget = null, cubeCamera = null;
 var faceMeshObj = null, faceMeshMatOcc, faceMeshMatDbg;
 var maskOffsetGroup = null;
 var maskOffset = {px:0, py:0, pz:0, rx:0, ry:-1, rz:-1, scale:1.0, scX:1.0, scY:1.05, scZ:0.4};
@@ -385,6 +386,18 @@ function initThree() {
   /* Flip U to match CSS scaleX(-1) mirror so reflections look like a real mirror */
   videoEnvTex.repeat.set(-1,1); videoEnvTex.offset.set(1,0);
   applyEnvMode('camera');
+
+  /* ── Real-time cube camera for glass reflections ──────────────────────────
+     Renders 6 cube faces from the glasses' position each frame, using the
+     webcam as the background, so the camera feed appears in the reflections.
+     128px is enough resolution for reflections and keeps render cost low. */
+  cubeRenderTarget = new THREE.WebGLCubeRenderTarget(128, {
+    format: THREE.RGBFormat,
+    generateMipmaps: true,
+    minFilter: THREE.LinearMipmapLinearFilter
+  });
+  cubeCamera = new THREE.CubeCamera(0.01, 50, cubeRenderTarget);
+  scene.add(cubeCamera);
 
   faceAnchor  = new THREE.Group(); scene.add(faceAnchor);
   offsetGroup = new THREE.Group(); faceAnchor.add(offsetGroup);
@@ -473,7 +486,14 @@ function updateSTLFaceMask(lm, mx) {
 
   /* ── _maskAnchor: world pos + head-pose rotation, NO scale ── */
   var faceZdyn = FACE_Z - cz * WORLD_W * 2.4;
-  anchor.position.set(-(cx-0.5)*WORLD_W, -(cy-0.5)*WORLD_H, faceZdyn);
+  /* Use depth-adjusted world size to avoid X/Y drift with head movement */
+  var maskWorldHdyn = 2 * Math.abs(faceZdyn) * Math.tan(FOV * DEG / 2);
+  var maskWorldWdyn = maskWorldHdyn * (vpW / vpH);
+  /* Remap centroid from full-video coords to visible-viewport coords */
+  var mcrop = getCropParams();
+  var mncx = (cx - mcrop.cropX) / mcrop.cropW;
+  var mncy = (cy - mcrop.cropY) / mcrop.cropH;
+  anchor.position.set(-(mncx-0.5)*maskWorldWdyn, -(mncy-0.5)*maskWorldHdyn, faceZdyn);
   anchor.scale.set(1,1,1); /* always 1 — scale lives in _maskScaleGroup */
 
   if (mx && mx.data) {
@@ -488,11 +508,13 @@ function updateSTLFaceMask(lm, mx) {
   maskOffsetGroup.rotation.set(maskOffset.rx*DEG, maskOffset.ry*DEG, maskOffset.rz*DEG);
   maskOffsetGroup.scale.set(1,1,1);
 
-  /* ── _maskScaleGroup: face oval dimensions — this is the only place scale lives ── */
-  var faceW = Math.max((maxX-minX)*WORLD_W, 0.001);
-  var faceH = Math.max((maxY-minY)*WORLD_H, 0.001);
+  /* ── _maskScaleGroup: face oval dimensions — this is the only place scale lives.
+     minX/maxX/minY/maxY are in raw video-frame units; divide by crop fractions
+     so the oval maps to correct physical size in the visible viewport. ── */
+  var faceW = Math.max((maxX-minX)/mcrop.cropW*maskWorldWdyn, 0.001);
+  var faceH = Math.max((maxY-minY)/mcrop.cropH*maskWorldHdyn, 0.001);
   var noseTip=lm[4], forehead=lm[10];
-  var faceD = Math.max(Math.abs((noseTip?noseTip.z:0)-(forehead?forehead.z:0))*WORLD_W*4.0, faceW*0.3);
+  var faceD = Math.max(Math.abs((noseTip?noseTip.z:0)-(forehead?forehead.z:0))*maskWorldWdyn/mcrop.cropW*4.0, faceW*0.3);
 
   scaleGrp.scale.set(
     faceW * maskOffset.scale * (maskOffset.scX||1),
@@ -526,19 +548,30 @@ function matPBR(color, met, rgh) {
   });
 }
 
-var GLASSES_OUTER_SPAN = 0;
+var GLASSES_OUTER_SPAN = (function(){
+  var R = 0.178, r = 0.013, cx = R + r + 0.002;
+  return (cx + R + r) * 2;
+})();
 function makeGlasses(color, met, rgh) {
   var g = new THREE.Group();
   var R = 0.178, r = 0.013;
   var cx = R + r + 0.002;
-  GLASSES_OUTER_SPAN = (cx + R + r) * 2;
 
   var lGeo = new THREE.TorusGeometry(R, r, 10, 52);
   var ll = new THREE.Mesh(lGeo, matPBR(color,met,rgh)); ll.position.x = -cx; g.add(ll);
   var rl = new THREE.Mesh(lGeo, matPBR(color,met,rgh)); rl.position.x =  cx; g.add(rl);
 
   var fGeo = new THREE.CircleGeometry(R - r*0.5, 44);
-  var tint = new THREE.MeshPhysicalMaterial({color:0x001828,transparent:true,opacity:0.56,roughness:0,metalness:0.04,side:THREE.FrontSide});
+  var tint = new THREE.MeshPhysicalMaterial({
+    color: 0x001828,
+    transparent: true,
+    opacity: 0.62,
+    roughness: 0,
+    metalness: 0.22,
+    reflectivity: 1,
+    envMapIntensity: 4.0,
+    side: THREE.FrontSide
+  });
   [-cx, cx].forEach(function(x) {
     var m = new THREE.Mesh(fGeo, tint.clone()); m.position.set(x, 0, -0.005); g.add(m);
   });
@@ -598,6 +631,46 @@ function buildDefaults() {
   n.forEach(function(p){p.offset=defOff();modelCache[p.id]=makeNecklace(p.color,p.met,p.rgh);catalogue.neck.push(p);});
 }
 
+/* ── CROP CORRECTION ──────────────────────────────────────────────────────
+   The video element uses object-fit:cover, so the browser scales the webcam
+   feed to fill the viewport and crops the excess.  MediaPipe processes the
+   *full* unscaled video frame and returns coordinates normalised to [0,1]
+   across that entire frame.  The Three.js canvas covers only the *visible*
+   cropped region.  Without correction, any MediaPipe coordinate that is
+   off-centre maps to the wrong screen position — the error grows linearly
+   with distance from centre, making the tracking look fine at centre but
+   increasingly wrong toward the top/bottom (or left/right) edges.
+
+   getCropParams() returns the visible window of the raw video in normalised
+   video-frame coordinates so callers can remap MediaPipe coords into the
+   viewport-relative coordinate space that Three.js expects.
+
+   Example — 1920×900 viewport, 1280×720 camera (both ~16:9 but viewport
+   slightly wider):
+     visAspect=2.13 > vidAspect=1.78 → top/bottom cropped
+     cropH = 1.78/2.13 = 0.836   (only 83.6% of video height is visible)
+     cropY = (1-0.836)/2 = 0.082  (the top 8.2% is hidden)
+   A face at MediaPipe cy=0.10 is near the top of the *visible* viewport,
+   but without correction the code treats it as 10% from the top of the full
+   video — placing the glasses too low. */
+function getCropParams() {
+  var vidW = video.videoWidth  || 1280;
+  var vidH = video.videoHeight || 720;
+  var vidAspect = vidW / vidH;
+  var visAspect = vpW / vpH;
+  var cropX = 0, cropY = 0, cropW = 1, cropH = 1;
+  if (visAspect > vidAspect) {
+    /* Viewport wider than video — top and bottom are cropped */
+    cropH = vidAspect / visAspect;
+    cropY = (1 - cropH) / 2;
+  } else if (visAspect < vidAspect) {
+    /* Viewport taller than video — left and right are cropped */
+    cropW = visAspect / vidAspect;
+    cropX = (1 - cropW) / 2;
+  }
+  return { cropX:cropX, cropY:cropY, cropW:cropW, cropH:cropH };
+}
+
 /* ── HEAD POSE ── */
 var _mat4 = new THREE.Matrix4();
 var _qRaw = new THREE.Quaternion();
@@ -613,16 +686,33 @@ function applyFacePose(lm, mx) {
   /* Dynamic FACE_Z: centroid Z maps to 3D depth so the anchor tracks real face depth */
   var faceZdyn = FACE_Z - cz * WORLD_W * 2.4;
 
+  /* Use the world size at faceZdyn, not the static FACE_Z baseline.
+     In perspective projection the visible world scales with depth, so using
+     the wrong depth constant causes X/Y drift whenever the face moves toward
+     or away from the camera (e.g. head tilt up/down). */
+  var worldHdyn = 2 * Math.abs(faceZdyn) * Math.tan(FOV * DEG / 2);
+  var worldWdyn = worldHdyn * (vpW / vpH);
+
+  /* Remap MediaPipe coords from full-video-frame space to visible-viewport space
+     so the 3D anchor maps to the correct screen position after object-fit:cover crop. */
+  var crop = getCropParams();
+  var ncx = (cx - crop.cropX) / crop.cropW;
+  var ncy = (cy - crop.cropY) / crop.cropH;
+
   faceAnchor.position.set(
-    -(cx - 0.5) * WORLD_W,
-    -(cy - 0.5) * WORLD_H,
+    -(ncx - 0.5) * worldWdyn,
+    -(ncy - 0.5) * worldHdyn,
     faceZdyn
   );
 
-  /* Scale: 3D span between widest cheek points (stable across pitch/roll) */
+  /* Scale: 3D span between widest cheek points (stable across pitch/roll).
+     Landmark differences are in raw video-frame units, so divide by crop
+     fractions to convert them to viewport-relative units before world scaling. */
   var lCh=lm[234], rCh=lm[454];
   if (!lCh||!rCh){faceAnchor.visible=false;return false;}
-  var dx=(rCh.x-lCh.x)*WORLD_W, dy=(rCh.y-lCh.y)*WORLD_H, dz=(rCh.z-lCh.z)*WORLD_W;
+  var dx=((rCh.x-lCh.x)/crop.cropW)*worldWdyn,
+      dy=((rCh.y-lCh.y)/crop.cropH)*worldHdyn,
+      dz= (rCh.z-lCh.z)           *worldWdyn/crop.cropW;
   var span3D = Math.max(Math.sqrt(dx*dx+dy*dy+dz*dz), 0.001);
   /* Normalize: STL face width = 1 world unit; cheek span ~ 0.88× face width */
   faceAnchor.scale.setScalar(span3D / (GLASSES_OUTER_SPAN * 0.58));
@@ -640,9 +730,15 @@ function applyFacePose(lm, mx) {
 function applyNeckPose(lm) {
   if (!lm||!lm.length) { faceAnchor.visible=false; return false; }
   var LS=lm[11], RS=lm[12]; if(!LS||!RS){faceAnchor.visible=false;return false;}
-  var cx=-((LS.x+RS.x)*0.5-0.5)*WORLD_W;
-  var cy=-((LS.y+RS.y)*0.5-0.5)*WORLD_H;
-  var dx=(RS.x-LS.x)*WORLD_W, dy=(RS.y-LS.y)*WORLD_H, dz=(RS.z-LS.z)*WORLD_W;
+  var crop = getCropParams();
+  /* Shoulder midpoint — remap from full-video coords to visible-viewport coords */
+  var rawMx=(LS.x+RS.x)*0.5, rawMy=(LS.y+RS.y)*0.5;
+  var nmx = (rawMx - crop.cropX) / crop.cropW;
+  var nmy = (rawMy - crop.cropY) / crop.cropH;
+  var cx=-(nmx-0.5)*WORLD_W;
+  var cy=-(nmy-0.5)*WORLD_H;
+  /* Shoulder span — differences need the same crop scaling */
+  var dx=(RS.x-LS.x)/crop.cropW*WORLD_W, dy=(RS.y-LS.y)/crop.cropH*WORLD_H, dz=(RS.z-LS.z)/crop.cropW*WORLD_W;
   var span3D=Math.max(Math.sqrt(dx*dx+dy*dy+dz*dz),0.001);
   faceAnchor.position.set(cx,cy,FACE_Z);
   faceAnchor.scale.setScalar(span3D/NECK_SPAN*0.92);
@@ -819,16 +915,18 @@ function startModalRender() {
     if(!modalRenderer||!modalScene) return;
     modalRenderer.setClearColor(0x060010,1);
     modalRenderer.clear();
+    /* Hide all models once up front — scissor test already isolates each cell,
+       so we only need to show/hide the current item per viewport draw. */
+    modalItems.forEach(function(o){ if(o.model) o.model.visible=false; });
     modalItems.forEach(function(item) {
       if (!item.model) return;
-      /* Hide all other models so only this item appears in its scissor cell */
-      modalItems.forEach(function(o){ if(o.model) o.model.visible=false; });
       item.model.visible=true;
       item.angle += 0.012;
       item.model.rotation.y = item.angle;
       modalRenderer.setViewport(item.vx, item.vy, item.vw, item.vh);
       modalRenderer.setScissor(item.vx, item.vy, item.vw, item.vh);
       modalRenderer.render(modalScene, item.cam);
+      item.model.visible=false;
     });
   }
   mloop();
@@ -901,9 +999,17 @@ document.getElementById('import-file-in').addEventListener('change', function(e)
     scene.add(group);
 
     var id='import_'+Date.now();
-    var prod={id:id,name:name,type:'face',color:'#c8d8ff',offset:defOff(),isImport:true};
+
+    /* Ask user whether this is a face or neck accessory so it is anchored correctly */
+    var typeChoice = window.confirm(
+      'Import "' + name + '" as a FACE accessory?\n\n' +
+      'Click OK for FACE (glasses, masks, etc.)\n' +
+      'Click Cancel for NECK (chains, necklaces, etc.)'
+    ) ? 'face' : 'neck';
+
+    var prod={id:id,name:name,type:typeChoice,color:'#c8d8ff',offset:defOff(),isImport:true};
     modelCache[id]=group;
-    catalogue.face.push(prod);
+    catalogue[typeChoice].push(prod);
     /* Show accessory modal so user can preview and select */
     setTimeout(function(){ openAccModal(); },200);
     URL.revokeObjectURL(url);
@@ -950,8 +1056,8 @@ vpEl.addEventListener('mousedown', function(e){
 document.addEventListener('mousemove', function(e){
   if(!dragging||!activeProd) return;
   var rect=vpEl.getBoundingClientRect();
-  var dx=(e.clientX-dragLastX)/rect.width  * 1.5;
-  var dy=(e.clientY-dragLastY)/rect.height * 1.5;
+  var dx=(e.clientX-dragLastX)/rect.width  * WORLD_W;
+  var dy=(e.clientY-dragLastY)/rect.height * WORLD_H;
   dragLastX=e.clientX; dragLastY=e.clientY;
   activeProd.offset.px=Math.max(-1,Math.min(1,(activeProd.offset.px||0)+dx));
   activeProd.offset.py=Math.max(-1,Math.min(1,(activeProd.offset.py||0)-dy));
@@ -971,8 +1077,8 @@ document.addEventListener('touchmove', function(e){
   if(!dragging||!activeProd) return;
   var t=e.touches[0];
   var rect=vpEl.getBoundingClientRect();
-  var dx=(t.clientX-dragLastX)/rect.width  * 1.5;
-  var dy=(t.clientY-dragLastY)/rect.height * 1.5;
+  var dx=(t.clientX-dragLastX)/rect.width  * WORLD_W;
+  var dy=(t.clientY-dragLastY)/rect.height * WORLD_H;
   dragLastX=t.clientX; dragLastY=t.clientY;
   activeProd.offset.px=Math.max(-1,Math.min(1,(activeProd.offset.px||0)+dx));
   activeProd.offset.py=Math.max(-1,Math.min(1,(activeProd.offset.py||0)-dy));
@@ -1007,7 +1113,7 @@ document.getElementById('clear-cat').addEventListener('click',function(){
   catalogue.face=[]; catalogue.neck=[];
   Object.keys(modelCache).forEach(function(k){scene.remove(modelCache[k]);});
   modelCache={}; activeProd=null; faceAnchor.visible=false; aname.textContent='NO ITEM';
-  buildDefaults(); syncAdminUI();
+  buildDefaults(); selectProd(catalogue.face[0]); syncAdminUI();
 });
 
 function applyEnvMode(mode){
@@ -1161,11 +1267,12 @@ bindLensStepper('fov','fovv','fov',1, function(v){return Math.round(v)+'°';});
 bindLensStepper('fz', 'fzv', 'fz',0.05, function(v){return parseFloat(v).toFixed(2);});
 
 document.getElementById('lens-reset').addEventListener('click',function(){
-  sceneFOV=60; sceneFaceZ=-2.5; applyFOV(); syncAdminUI();
+  sceneFOV=6; sceneFaceZ=-3.7; applyFOV(); syncAdminUI();
 });
 
 document.getElementById('mask-reset').addEventListener('click',function(){
-  maskOffset={px:0,py:0,pz:0,rx:0,ry:0,rz:0,scale:1.0,scX:1.0,scY:1.0,scZ:1.0};
+  /* Restore the original calibrated defaults that match the embedded face STL occluder */
+  maskOffset={px:0,py:0,pz:0,rx:0,ry:-1,rz:-1,scale:1.0,scX:1.0,scY:1.05,scZ:0.4};
   applyMaskOffset(); syncAdminUI();
 });
 
@@ -1297,6 +1404,32 @@ function loop(){
     if(window._maskAnchor) window._maskAnchor.visible=false;
     setStatus('STANDBY',true);
   }
+
+  /* ── Real-time reflection update ─────────────────────────────────────────
+     Only update when a face is visible (saves 6 render calls when idle).
+     We temporarily:
+       1. Set the webcam feed as the scene background so the cube camera
+          captures it from the glasses' vantage point.
+       2. Hide the face anchor (accessories + occluder) so they don't
+          block their own reflection faces.
+       3. Run cubeCamera.update() — renders 6×128px faces into the cube map.
+       4. Restore visibility and clear the background (main render is
+          transparent so the CSS video layer shows through). */
+  if (cubeCamera && faceAnchor && faceAnchor.visible) {
+    var _cubeBg = envMode === 'camera'  ? videoEnvTex
+                : envMode === 'custom'  ? (customEnvTex || builtinEnv)
+                : builtinEnv;
+    scene.background = _cubeBg;
+    cubeCamera.position.copy(faceAnchor.position);
+    faceAnchor.visible = false;
+    if (window._maskAnchor) window._maskAnchor.visible = false;
+    cubeCamera.update(renderer, scene);
+    faceAnchor.visible = true;
+    if (window._maskAnchor) window._maskAnchor.visible = true;
+    scene.background = null;
+    scene.environment = cubeRenderTarget.texture;
+  }
+
   drawOrnaments();
   renderer.render(scene,camera);
 }
